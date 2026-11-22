@@ -1,0 +1,25 @@
+---
+export const prerender = false;
+import Layout from '../layouts/Layout.astro';
+import { getSiteSettings, publicImageUrl } from '../lib/site-content';
+const settings = await getSiteSettings();
+---
+<Layout title="Profile" description="Samuel Khawsigan’s background, working areas and education.">
+  <div class="about-page">
+    <section class="about-intro" aria-labelledby="about-title">
+      <div class="about-copy"><h1 id="about-title">Profile</h1><p>{settings.profile_intro_1}</p><p>{settings.profile_intro_2}</p><p>{settings.profile_intro_3}</p><a class="text-command" href="/contact/">Get in touch</a></div>
+      <figure class="profile-dossier profile-photo"><img src={publicImageUrl(settings.profile_portrait_path) ?? '/images/about/samuel-portrait.webp'} alt={settings.profile_portrait_alt} width="640" height="640" fetchpriority="high"/></figure>
+    </section>
+    <section class="about-skills" aria-labelledby="skills-title"><div class="section-heading"><h2 id="skills-title">Areas of focus</h2></div><div class="skill-columns">
+      <div class="skill-module"><span class="eyebrow">APPLICATIONS</span><h3>Web + LLM security</h3><p>Web pentesting and testing model-backed applications.</p><div class="skill-slot">{settings.profile_web_tools}</div></div>
+      <div class="skill-module"><span class="eyebrow">BINARIES</span><h3>Reverse engineering</h3><p>Crackmes, disassembly, and debugging.</p><div class="skill-slot">{settings.profile_re_tools}</div></div>
+      <div class="skill-module"><span class="eyebrow">INFRASTRUCTURE</span><h3>Homelab + SIEM</h3><p>Lab infrastructure, logging, and making sense of the output.</p><div class="skill-slot">{settings.profile_siem_tools}</div></div>
+    </div></section>
+    <section class="about-experience" aria-labelledby="experience-title"><div class="section-heading"><h2 id="experience-title">Experience &amp; education</h2></div><ol class="experience-timeline">
+      <li><div class="timeline-label"><span>COMPLETED</span><small>{settings.profile_internship_dates}</small></div><div class="timeline-entry"><h3>Cybersecurity internship</h3><span class="timeline-place">Telecom company</span><p>Completed an internship in cybersecurity.</p><p class="timeline-placeholder">{settings.profile_internship}</p></div></li>
+      <li><div class="timeline-label"><span>STUDYING</span><small>{settings.profile_diploma_dates}</small></div><div class="timeline-entry"><h3>Diploma in Information Technology</h3><span class="timeline-place">{settings.profile_diploma_institution}</span><p>Currently a Diploma in IT student.</p><p class="timeline-placeholder">{settings.profile_diploma}</p></div></li>
+      <li><div class="timeline-label"><span>NEXT</span><small>{settings.profile_apu_start_date}</small></div><div class="timeline-entry"><h3>BSc Computer Science (Cyber Security)</h3><span class="timeline-place">Asia Pacific University (APU)</span><p>My next study step. Not a completed qualification.</p></div></li>
+    </ol></section>
+    <section class="about-learning photo-learning" aria-labelledby="learning-title"><div class="section-heading"><h2 id="learning-title">Currently learning</h2></div><p>{settings.profile_learning}</p><a class="text-command" href="/uses/">See my setup</a></section>
+  </div>
+</Layout>

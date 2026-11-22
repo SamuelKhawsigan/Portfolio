@@ -1,0 +1,17 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getAdminClient } from '../../../lib/auth';
+const supabase = await getAdminClient(Astro);
+if (!supabase) return Astro.redirect('/admin/login/');
+const { data: items, error } = await supabase.from('achievement_items')
+  .select('id,slug,title,category,status,image_path,display_order')
+  .order('display_order', { ascending: true });
+const imageUrl = (path: string) => path.startsWith('/') ? path
+  : supabase.storage.from('portfolio-gallery').getPublicUrl(path).data.publicUrl;
+---
+<AdminLayout title="Achievements">
+  <div class="page-actions"><h1>Achievements</h1><a href="/admin/achievements/new/" class="btn btn-primary">Add record</a></div>
+  <p class="help">Course completions, workshop participation and team CTF results appear under Work. Keep rankings labelled as team results.</p>
+  {error ? <p class="msg msg-err" role="alert">Couldn’t load records. Apply migration 004 and check permissions.</p> : items?.length ? <div class="item-list">{items.map(item => <div class="item-row"><img class="thumb" src={imageUrl(item.image_path)} alt="" loading="lazy"/><div><div class="item-title">{item.title}</div><div class="item-meta">{item.category} · order {item.display_order}</div></div><span class={`badge badge-${item.status}`}>{item.status}</span><div class="row-actions"><a class="btn btn-sm" href={`/admin/achievements/${item.id}/`}>Edit</a></div></div>)}</div> : <p class="help">No records yet.</p>}
+</AdminLayout>

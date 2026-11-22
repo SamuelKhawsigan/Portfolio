@@ -1,0 +1,109 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getAdminClient } from '../../../lib/auth';
+import { uploadPortfolioImage } from '../../../lib/admin-media';
+
+const supabase = await getAdminClient(Astro);
+if (!supabase) return Astro.redirect('/admin/login/');
+if (Astro.request.method === 'POST' && Astro.request.headers.get('origin') && Astro.request.headers.get('origin') !== Astro.url.origin) {
+  return new Response('Forbidden', { status: 403 });
+}
+const id = Astro.params.id ?? '';
+const isNew = id === 'new';
+const validId = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id);
+const blank = { title: '', slug: '', excerpt: '', content_md: '', status: 'draft', published_at: null, version: 0 };
+const result = !isNew && validId
+  ? await supabase.from('posts').select('title,slug,excerpt,content_md,status,published_at,version').eq('id', id).maybeSingle()
+  : null;
+const existing = result?.data;
+if (!isNew && !existing) Astro.response.status = result?.error ? 503 : 404;
+let values = existing ?? blank;
+let error = '';
+let version = values.version;
+
+if (Astro.request.method === 'POST' && (isNew || existing)) {
+  const form = await Astro.request.formData();
+  const read = (field: string) => String(form.get(field) ?? '').trim();
+  const status = read('status');
+  const image = form.get('image');
+  const hasImage = image instanceof File && image.size > 0;
+  const imageAlt = read('image_alt');
+  version = Number(read('version'));
+  values = {
+    ...values,
+    title: read('title'),
+    slug: existing?.status === 'published' ? existing.slug : read('slug').toLowerCase(),
+    excerpt: read('excerpt'),
+    content_md: read('content_md'),
+    status,
+  };
+
+  if (!values.title || values.title.length > 160 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(values.slug) || values.slug.length > 100) {
+    error = 'Enter a title and a URL slug using lowercase letters, numbers, and hyphens.';
+  } else if (!['draft', 'published'].includes(status) || (status === 'published' && !values.content_md) || (values.excerpt?.length ?? 0) > 320 || values.content_md.length > 100000) {
+    error = 'Check the post length and add body text before publishing.';
+  } else if (hasImage && (!imageAlt || imageAlt.length > 300)) {
+    error = 'Add a short image description before uploading.';
+  } else if (existing && version !== existing.version) {
+    Astro.response.status = 409;
+    error = 'This post has changed since you opened it. Copy your edits before reopening the latest version.';
+  } else {
+    let uploadedPath = '';
+    let content_md = values.content_md;
+    if (hasImage) {
+      const upload = await uploadPortfolioImage(supabase, image, 'blog');
+      error = upload.error;
+      uploadedPath = upload.path;
+      if (uploadedPath) {
+        const imageUrl = supabase.storage.from('portfolio-gallery').getPublicUrl(uploadedPath).data.publicUrl;
+        content_md += `\n\n![${imageAlt.replace(/[\[\]]/g, '')}](${imageUrl})\n`;
+      }
+    }
+    if (!error && content_md.length > 100000) error = 'The post is too long after adding the image.';
+    if (error && uploadedPath) await supabase.storage.from('portfolio-gallery').remove([uploadedPath]);
+    if (!error) {
+      const { title, slug, excerpt } = values;
+      const post = { title, slug, excerpt, content_md, status, published_at: status === 'published' ? existing?.published_at ?? new Date().toISOString() : null };
+      const save = isNew
+        ? await supabase.from('posts').insert(post).select('id').single()
+        : await supabase.from('posts').update(post).eq('id', id).eq('version', version).select('id').maybeSingle();
+      if (save.data) return Astro.redirect(`/admin/posts/${save.data.id}/?saved=1`, 303);
+      if (uploadedPath) await supabase.storage.from('portfolio-gallery').remove([uploadedPath]);
+      if (!save.error) {
+        Astro.response.status = 409;
+        error = 'This post changed while you were saving. Copy your edits before reopening it.';
+      } else if (save.error.code === '23505') {
+        error = 'That URL slug is already in use.';
+      } else {
+        Astro.response.status = 503;
+        error = 'Couldn’t save the post. Check your connection and blog permissions, then try again.';
+      }
+    }
+  }
+  if (error && Astro.response.status === 200) Astro.response.status = 400;
+}
+---
+<AdminLayout title={isNew ? 'New blog post' : 'Edit blog post'}>
+  <p><a href="/admin/posts/">← All posts</a></p>
+  {existing || isNew ? (
+    <>
+      <h1>{isNew ? 'New blog post' : 'Edit blog post'}</h1>
+      {error ? <p class="msg msg-err" role="alert">{error}</p> : Astro.url.searchParams.has('saved') && <p class="msg msg-ok" role="status">Post saved.</p>}
+      <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="version" value={version} />
+        <div class="field"><label for="title">Title</label><input id="title" name="title" value={values.title} maxlength="160" required /></div>
+        <div class="field"><label for="slug">URL slug</label><input id="slug" name="slug" value={values.slug} pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="100" readonly={existing?.status === 'published'} required /></div>
+        <div class="field"><label for="excerpt">Summary</label><input id="excerpt" name="excerpt" value={values.excerpt ?? ''} maxlength="320" /></div>
+        <div class="field"><label for="content_md">Post body (Markdown)</label><textarea id="content_md" name="content_md" rows="16" maxlength="100000">{values.content_md}</textarea></div>
+        <div class="field"><label for="image">Add an image to the end of this post (optional)</label><input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp"/><small>JPEG, PNG or WebP up to 8 MB. The upload is converted to WebP and stripped of metadata. Remove sensitive details visible in the picture before uploading.</small></div>
+        <div class="field"><label for="image_alt">Image description</label><input id="image_alt" name="image_alt" value={Astro.request.method === 'POST' ? imageAlt : ''} maxlength="300" placeholder="What the image shows"/><small>Required when adding an image. It becomes the image’s alt text.</small></div>
+        <div class="field"><label for="status">Visibility</label><select id="status" name="status"><option value="draft" selected={values.status !== 'published'}>Draft</option><option value="published" selected={values.status === 'published'}>Published</option></select></div>
+        <button type="submit" class="btn btn-primary">Save post</button>
+      </form>
+    </>
+  ) : <h1>{result?.error ? 'Couldn’t load the post' : 'Post not found'}</h1>}
+</AdminLayout>
+<style>
+  .field small{display:block;color:var(--muted);margin-top:.35rem}
+</style>

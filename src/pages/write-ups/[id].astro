@@ -1,0 +1,11 @@
+---
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import { getEntry, render } from 'astro:content';
+const entry = await getEntry('writeups', Astro.params.id ?? '');
+if (!entry) Astro.response.status = 404;
+const Content = entry ? (await render(entry)).Content : null;
+---
+<Layout title={entry?.data.title ?? '404'} description={entry?.data.description ?? 'Write-up not found.'}>
+  <article class="prose"><a class="pane-link" href="/write-ups/">← Write-ups</a>{entry && Content ? <><div class="eyebrow" style="margin-top:2.2rem">{entry.data.placeholder?'[PLACEHOLDER] / template':'write-up'}</div><h1>{entry.data.title}</h1><Content/></> : <h1>Write-up not found</h1>}</article>
+</Layout>

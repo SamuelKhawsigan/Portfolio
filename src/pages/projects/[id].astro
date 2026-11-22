@@ -1,0 +1,36 @@
+---
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import { getEntry, render } from 'astro:content';
+import { getPublicProjects, publicImageUrl } from '../../lib/site-content';
+import { renderMarkdown } from '../../lib/markdown';
+
+const id = Astro.params.id ?? '';
+const managed = (await getPublicProjects()).find(project => project.slug === id);
+const entry = managed ? undefined : await getEntry('projects', id);
+if (!managed && !entry) Astro.response.status = 404;
+const Content = entry ? (await render(entry)).Content : null;
+const sections = managed ? await Promise.all([
+  ['Problem', managed.problem], ['Approach', managed.approach], ['Tools', managed.tools],
+  ['Result', managed.result], ['What I learned', managed.learned],
+].map(async ([heading, body]) => ({ heading, html: await renderMarkdown(body) }))) : [];
+const safeExternal = (value: string | null) => {
+  if (!value) return null;
+  try { const url = new URL(value); return url.protocol === 'https:' ? url.href : null; }
+  catch { return null; }
+};
+---
+<Layout title={managed?.title ?? entry?.data.title ?? '404'} description={managed?.description ?? entry?.data.description ?? 'Project not found.'}>
+  <article class="prose">
+    <a class="pane-link" href="/projects/">← All work</a>
+    {managed ? <>
+      <div class="eyebrow" style="margin-top:2.2rem">Project notes</div>
+      <h1>{managed.title}</h1>
+      {managed.description && <p>{managed.description}</p>}
+      {managed.cover_image && <figure><img src={publicImageUrl(managed.cover_image) ?? undefined} alt={managed.cover_alt ?? ''} loading="lazy" decoding="async"/></figure>}
+      {sections.map(section => section.html && <section><h2>{section.heading}</h2><div set:html={section.html}/></section>)}
+      {(safeExternal(managed.repo_url) || safeExternal(managed.live_url)) && <p class="project-links">{safeExternal(managed.repo_url) && <a class="editorial-link" href={safeExternal(managed.repo_url) ?? undefined}>Source ↗</a>}{safeExternal(managed.live_url) && <a class="editorial-link" href={safeExternal(managed.live_url) ?? undefined}>Live site ↗</a>}</p>}
+    </> : entry && Content ? <><div class="eyebrow" style="margin-top:2.2rem">{entry.data.placeholder?'[PLACEHOLDER] / unpublished work':'project notes'}</div><h1>{entry.data.title}</h1><Content/></> : <h1>Project not found</h1>}
+  </article>
+</Layout>
+<style>.project-links{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:2rem}</style>

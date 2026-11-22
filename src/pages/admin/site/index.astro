@@ -1,0 +1,101 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getAdminClient } from '../../../lib/auth';
+import { siteDefaults, type SiteKey, type SiteSettings } from '../../../lib/site-content';
+import { uploadPortfolioImage } from '../../../lib/admin-media';
+
+const supabase = await getAdminClient(Astro);
+if (!supabase) return Astro.redirect('/admin/login/');
+
+const keys = Object.keys(siteDefaults) as SiteKey[];
+const sections: { title: string; fields: { key: SiteKey; label: string }[] }[] = [
+  { title: 'Home', fields: [
+    { key: 'home_intro', label: 'Introduction' }, { key: 'home_portrait_caption', label: 'Portrait caption' },
+    { key: 'home_work_heading', label: 'Work heading' }, { key: 'home_events_heading', label: 'Events heading' },
+    { key: 'home_notes_heading', label: 'Blog heading' }, { key: 'home_notes_intro', label: 'Blog introduction' },
+  ] },
+  { title: 'Profile', fields: [
+    { key: 'profile_portrait_alt', label: 'Portrait image description' },
+    { key: 'profile_intro_1', label: 'Introduction, paragraph 1' }, { key: 'profile_intro_2', label: 'Introduction, paragraph 2' },
+    { key: 'profile_intro_3', label: 'Introduction, paragraph 3' }, { key: 'profile_web_tools', label: 'Web and LLM tools' },
+    { key: 'profile_re_tools', label: 'Reverse engineering tools' }, { key: 'profile_siem_tools', label: 'Homelab and SIEM tools' },
+    { key: 'profile_internship', label: 'Internship details' }, { key: 'profile_internship_dates', label: 'Internship dates' },
+    { key: 'profile_diploma', label: 'Diploma details' }, { key: 'profile_diploma_dates', label: 'Diploma dates' },
+    { key: 'profile_diploma_institution', label: 'Diploma institution' }, { key: 'profile_apu_start_date', label: 'APU start date' },
+    { key: 'profile_learning', label: 'Currently learning' }, { key: 'profile_certifications_note', label: 'Certification note' },
+  ] },
+  { title: 'Events and setup', fields: [
+    { key: 'events_intro', label: 'Events introduction' }, { key: 'uses_intro', label: 'Setup introduction' },
+    { key: 'uses_hardware', label: 'Hardware' }, { key: 'uses_os', label: 'Operating system' },
+    { key: 'uses_editor', label: 'Editor' }, { key: 'uses_terminal', label: 'Terminal' },
+    { key: 'uses_web', label: 'Web testing' }, { key: 'uses_re', label: 'Reverse engineering' },
+    { key: 'uses_siem', label: 'Homelab and SIEM' },
+  ] },
+  { title: 'Contact and footer', fields: [
+    { key: 'contact_intro', label: 'Contact introduction' }, { key: 'contact_email', label: 'Email address' },
+    { key: 'contact_github', label: 'GitHub URL' }, { key: 'contact_linkedin', label: 'LinkedIn URL' },
+    { key: 'footer_heading', label: 'Footer heading' }, { key: 'footer_intro', label: 'Footer introduction' },
+  ] },
+];
+
+const loaded = await supabase.from('site_settings').select('key,value');
+let values: SiteSettings = { ...siteDefaults };
+for (const item of loaded.data ?? []) {
+  if (keys.includes(item.key as SiteKey)) values[item.key as SiteKey] = item.value;
+}
+let error = loaded.error ? 'The site editor tables are not ready. Apply migration 003 in Supabase.' : '';
+if (loaded.error) Astro.response.status = 503;
+
+if (Astro.request.method === 'POST' && !loaded.error) {
+  const origin = Astro.request.headers.get('origin');
+  if (origin && origin !== Astro.url.origin) {
+    error = 'This request did not come from the site editor.';
+  } else {
+    const form = await Astro.request.formData();
+    values = Object.fromEntries(keys.map(key => [key, key === 'profile_portrait_path' ? values[key] : String(form.get(key) ?? '').trim()])) as SiteSettings;
+    const socialUrl = (value: string, host: string) => {
+      try { const url = new URL(value); return url.protocol === 'https:' && (url.hostname === host || url.hostname === `www.${host}`); }
+      catch { return false; }
+    };
+    if (keys.some(key => values[key].length > 1200) || !values.profile_portrait_alt || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.contact_email) ||
+        !socialUrl(values.contact_github, 'github.com') || !socialUrl(values.contact_linkedin, 'linkedin.com')) {
+      error = 'Check the field lengths, email address, and GitHub and LinkedIn URLs.';
+    } else {
+      let uploadedPath = '';
+      const portrait = form.get('portrait');
+      if (portrait instanceof File && portrait.size > 0) {
+        const upload = await uploadPortfolioImage(supabase, portrait);
+        error = upload.error;
+        uploadedPath = upload.path;
+        if (uploadedPath) values.profile_portrait_path = uploadedPath;
+      }
+      if (!error) {
+        const rows = keys.map(key => ({ key, value: values[key], updated_at: new Date().toISOString() }));
+        const save = await supabase.from('site_settings').upsert(rows, { onConflict: 'key' });
+        if (!save.error) return Astro.redirect('/admin/site/?saved=1', 303);
+        if (uploadedPath) await supabase.storage.from('portfolio-gallery').remove([uploadedPath]);
+        error = 'Couldn’t save site text. Check the database permissions and try again.';
+        Astro.response.status = 503;
+      }
+    }
+  }
+  if (error && Astro.response.status === 200) Astro.response.status = 400;
+}
+---
+<AdminLayout title="Site text">
+  <div class="page-actions"><h1>Site text</h1><a class="btn" href="/">View site ↗</a></div>
+  <p class="help">Edit the words and contact links used across the public pages. Save once at the bottom. Layout and colors stay in the site code.</p>
+  {error ? <p class="msg msg-err" role="alert">{error}</p> : Astro.url.searchParams.has('saved') && <p class="msg msg-ok" role="status">Site text saved.</p>}
+  <form method="POST" enctype="multipart/form-data">
+    <div class="form-section"><h2>Portrait</h2><p class="help">Used on Home and Profile. Use a photo of yourself and remove sensitive metadata before uploading.</p><div class="field"><label for="portrait">Replace portrait (optional)</label><input id="portrait" name="portrait" type="file" accept="image/jpeg,image/png,image/webp"/></div></div>
+    {sections.map(section => <section class="form-section"><h2>{section.title}</h2><div class="site-fields">{section.fields.map(({key,label}) => <div class="field"><label for={key}>{label}</label>{key === 'contact_email' || key === 'contact_github' || key === 'contact_linkedin' ? <input id={key} name={key} value={values[key]} type={key === 'contact_email' ? 'email' : 'url'} maxlength="1200" required /> : <textarea id={key} name={key} rows="2" maxlength="1200">{values[key]}</textarea>}</div>)}</div></section>)}
+    <div class="form-actions"><button class="btn btn-primary" type="submit" disabled={!!loaded.error}>Save site text</button></div>
+  </form>
+</AdminLayout>
+<style>
+  .site-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 1.2rem}
+  .site-fields .field{min-width:0}
+  .site-fields textarea{min-height:76px}
+  @media(max-width:720px){.site-fields{grid-template-columns:1fr}}
+</style>

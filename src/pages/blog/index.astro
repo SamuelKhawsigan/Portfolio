@@ -1,0 +1,32 @@
+---
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import { createPublicBlogClient } from '../../lib/supabase';
+
+const client = createPublicBlogClient();
+const result = client && await client.from('posts')
+  .select('slug,title,excerpt,published_at')
+  .eq('status', 'published')
+  .order('published_at', { ascending: false, nullsFirst: false });
+const posts = result?.data ?? [];
+if (result?.error) Astro.response.status = 503;
+---
+<Layout title="Blog" description="Samuel Khawsigan’s cybersecurity blog and learning notes.">
+  <div class="page-head"><h1>Blog</h1><a class="text-command" href="/write-ups/">Write-up archive ↗</a></div>
+  {result?.error ? <p>Couldn’t load posts. Please try again later.</p> : posts.length === 0 ? <p>No blog posts yet.</p> : (
+    <div class="project-rows">
+      {posts.map((post) => (
+        <article class="blog-entry">
+          {post.published_at && <time class="eyebrow" datetime={post.published_at}>{new Date(post.published_at).toLocaleDateString('en-GB', { dateStyle: 'long', timeZone: 'Asia/Kuala_Lumpur' })}</time>}
+          <h2><a href={`/blog/${encodeURIComponent(post.slug)}/`}>{post.title}</a></h2>
+          {post.excerpt && <p>{post.excerpt}</p>}
+        </article>
+      ))}
+    </div>
+  )}
+</Layout>
+<style>
+  .blog-entry { padding: 1.5rem 0; border-bottom: 1px solid var(--line); }
+  .blog-entry h2 { margin: .5rem 0; }
+  .blog-entry p { color: var(--muted); margin: 0; }
+</style>

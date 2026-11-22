@@ -1,0 +1,17 @@
+---
+import { getAchievements, getSiteSettings } from '../lib/site-content';
+const achievements = await getAchievements();
+const settings = await getSiteSettings();
+const groups = [
+  ['Learning paths & course completions', achievements.filter(item => item.category === 'completion')],
+  ['Workshop participation', achievements.filter(item => item.category === 'participation')],
+  ['CTF participation & team results', achievements.filter(item => item.category === 'ctf')],
+] as const;
+---
+<section class="evidence-archive" aria-labelledby="evidence-title">
+  <div class="section-heading"><h2 id="evidence-title">Completions &amp; participation</h2></div>
+  <p class="archive-context">The records, with the receipts. CTF results below belong to team <span class="mono">orient</span>.</p>
+  {groups.map(([label,items])=><section class="record-group"><h3>{label}</h3><div class="record-list">{items.map(item=><details class="evidence-record" id={item.slug}><summary><span><strong>{item.title}</strong><span class="record-meta">{item.issuer} / {item.type}</span></span><span class="record-date">{item.date}<span class="record-open">View record</span></span></summary><div class="record-body">{item.detail&&<p>{item.detail}</p>}<a href={item.src} aria-label={`Open full image: ${item.title}`}><img src={item.src} alt={item.alt} width={item.width ?? undefined} height={item.height ?? undefined} loading="lazy" decoding="async"/></a><a class="text-command" href={item.src}>Open full image</a></div></details>)}</div></section>)}
+  <p class="evidence-note">{settings.profile_certifications_note}</p>
+</section>
+

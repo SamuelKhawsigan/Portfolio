@@ -1,0 +1,90 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getAdminClient } from '../../../lib/auth';
+import { uploadPortfolioImage } from '../../../lib/admin-media';
+const supabase = await getAdminClient(Astro);
+if (!supabase) return Astro.redirect('/admin/login/');
+const id = Astro.params.id ?? '';
+const isNew = id === 'new';
+const validId = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id);
+const loaded = !isNew && validId ? await supabase.from('projects').select('*').eq('id', id).maybeSingle() : null;
+const existing = loaded?.data;
+if (!isNew && !existing) Astro.response.status = loaded?.error ? 503 : 404;
+let values = existing ? {
+  ...existing, description: existing.description ?? '', problem: existing.problem ?? '',
+  approach: existing.approach ?? '', tools: existing.tools ?? '', result: existing.result ?? '',
+  learned: existing.learned ?? '', repo_url: existing.repo_url ?? '', live_url: existing.live_url ?? '',
+  cover_image: existing.cover_image ?? '', cover_alt: existing.cover_alt ?? '',
+} : { title: '', slug: '', description: '', problem: '', approach: '', tools: '', result: '', learned: '', repo_url: '', live_url: '', cover_image: '', cover_alt: '', status: 'draft', featured: false, display_order: 50 };
+let error = '';
+const imageUrl = (path: string) => path.startsWith('/') ? path
+  : supabase.storage.from('portfolio-gallery').getPublicUrl(path).data.publicUrl;
+
+if (Astro.request.method === 'POST' && (isNew || existing)) {
+  const origin = Astro.request.headers.get('origin');
+  if (origin && origin !== Astro.url.origin) error = 'This request did not come from the project editor.';
+  else {
+    const form = await Astro.request.formData();
+    const read = (key: string) => String(form.get(key) ?? '').trim();
+    values = { ...values, title: read('title'), slug: existing?.status === 'published' ? existing.slug : read('slug').toLowerCase(), description: read('description'),
+      problem: read('problem'), approach: read('approach'), tools: read('tools'), result: read('result'),
+      learned: read('learned'), repo_url: read('repo_url'), live_url: read('live_url'),
+      cover_alt: read('cover_alt'), status: read('status'), featured: form.has('featured'),
+      display_order: Number(read('display_order')) };
+    const safeUrl = (value: string) => { if (!value) return true; try { return new URL(value).protocol === 'https:'; } catch { return false; } };
+    const file = form.get('photo');
+    if (!values.title || values.title.length > 180 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(values.slug) ||
+      values.slug.length > 100 || values.description.length > 500 ||
+      ['problem','approach','tools','result','learned'].some(key => String(values[key as keyof typeof values] ?? '').length > 10000) ||
+      !['draft','published'].includes(values.status) || !Number.isInteger(values.display_order) || Math.abs(values.display_order) > 100000 ||
+      !safeUrl(values.repo_url) || !safeUrl(values.live_url) || values.repo_url.length > 2000 || values.live_url.length > 2000 || values.cover_alt.length > 300 ||
+      ((values.cover_image || (file instanceof File && file.size > 0)) && !values.cover_alt) ||
+      (values.status === 'published' && (!values.problem || !values.approach || !values.tools || !values.result))) {
+      error = 'Check the title, slug, links and field lengths. Published projects need a problem, approach, tools and result.';
+    } else {
+      let uploadedPath = '';
+      if (file instanceof File && file.size > 0) {
+        const upload = await uploadPortfolioImage(supabase, file);
+        error = upload.error;
+        uploadedPath = upload.path;
+        if (uploadedPath) values.cover_image = uploadedPath;
+      }
+      if (!error) {
+        const row = { title: values.title, slug: values.slug, description: values.description, problem: values.problem,
+          approach: values.approach, tools: values.tools, result: values.result, learned: values.learned,
+          repo_url: values.repo_url || null, live_url: values.live_url || null,
+          cover_image: values.cover_image || null, cover_alt: values.cover_alt || null,
+          status: values.status, featured: values.featured, display_order: values.display_order,
+          updated_at: new Date().toISOString() };
+        const save = isNew ? await supabase.from('projects').insert(row).select('id').single()
+          : await supabase.from('projects').update(row).eq('id', id).select('id').maybeSingle();
+        if (save.data) return Astro.redirect(`/admin/projects/${save.data.id}/?saved=1`, 303);
+        if (uploadedPath) await supabase.storage.from('portfolio-gallery').remove([uploadedPath]);
+        error = save.error?.code === '23505' ? 'That URL slug is already in use.' : 'Couldn’t save the project. Check database permissions and try again.';
+      }
+    }
+  }
+  if (error && Astro.response.status === 200) Astro.response.status = 400;
+}
+---
+<AdminLayout title={isNew ? 'Add project' : 'Edit project'}>
+  <p><a href="/admin/projects/">← All projects</a></p>
+  {isNew || existing ? <><h1>{isNew ? 'Add project' : 'Edit project'}</h1>
+    {error ? <p class="msg msg-err" role="alert">{error}</p> : Astro.url.searchParams.has('saved') && <p class="msg msg-ok" role="status">Project saved.</p>}
+    {values.cover_image && <img class="project-preview" src={imageUrl(values.cover_image)} alt={values.cover_alt || 'Current project image'}/>}
+    <form method="POST" enctype="multipart/form-data">
+      <div class="field-row"><div class="field"><label for="title">Title</label><input id="title" name="title" value={values.title} maxlength="180" required/></div><div class="field"><label for="slug">URL slug</label><input id="slug" name="slug" value={values.slug} maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" readonly={existing?.status === 'published'} required/></div></div>
+      <div class="field"><label for="description">Short summary</label><textarea id="description" name="description" rows="2" maxlength="500">{values.description}</textarea></div>
+      <p class="help">The sections below accept Markdown. Keep screenshots sanitized and claims specific.</p>
+      {([['problem','Problem'],['approach','Approach'],['tools','Tools'],['result','Result'],['learned','What I learned']] as const).map(([key,label]) => <div class="field"><label for={key}>{label}</label><textarea id={key} name={key} rows="5" maxlength="10000">{values[key]}</textarea></div>)}
+      <div class="field"><label for="photo">Project image (optional)</label><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp"/><small>JPEG, PNG or WebP, maximum 8 MB.</small></div>
+      <div class="field"><label for="cover_alt">Image description</label><input id="cover_alt" name="cover_alt" value={values.cover_alt ?? ''} maxlength="300"/></div>
+      <div class="field-row"><div class="field"><label for="repo_url">Source URL (optional)</label><input id="repo_url" name="repo_url" type="url" value={values.repo_url ?? ''} maxlength="2000"/></div><div class="field"><label for="live_url">Live URL (optional)</label><input id="live_url" name="live_url" type="url" value={values.live_url ?? ''} maxlength="2000"/></div></div>
+      <div class="field-row"><div class="field"><label for="display_order">Order (smallest first)</label><input id="display_order" name="display_order" type="number" value={values.display_order} min="-100000" max="100000" required/></div><div class="field"><label for="status">Visibility</label><select id="status" name="status"><option value="draft" selected={values.status === 'draft'}>Draft</option><option value="published" selected={values.status === 'published'}>Published</option></select></div></div>
+      <div class="field"><label class="checkbox-label"><input type="checkbox" name="featured" checked={values.featured}/> Feature on Home</label></div>
+      <div class="form-actions"><button class="btn btn-primary" type="submit">Save project</button>{!isNew && values.status === 'published' && <a class="btn" href={`/projects/${values.slug}/`}>View project ↗</a>}</div>
+    </form>
+  </> : <h1>{loaded?.error ? 'Couldn’t load project' : 'Project not found'}</h1>}
+</AdminLayout>
+<style>.project-preview{display:block;max-width:100%;max-height:320px;object-fit:contain;margin:0 0 1.5rem;border:1px solid var(--line)}.field small{display:block;color:var(--muted);margin-top:.35rem}.checkbox-label{display:flex!important;align-items:center;gap:.6rem;text-transform:none!important;font:1rem var(--sans)!important}.checkbox-label input{width:auto}</style>

@@ -1,0 +1,18 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getAdminClient } from '../../../lib/auth';
+
+const supabase = await getAdminClient(Astro);
+if (!supabase) return Astro.redirect('/admin/login/');
+const { data: photos, error } = await supabase.from('gallery_items')
+  .select('id,slug,title,summary,image_path,status,display_order')
+  .order('display_order', { ascending: true });
+const imageUrl = (path: string) => path.startsWith('/') ? path
+  : supabase.storage.from('portfolio-gallery').getPublicUrl(path).data.publicUrl;
+---
+<AdminLayout title="Gallery">
+  <div class="page-actions"><h1>Gallery</h1><a href="/admin/gallery/new/" class="btn btn-primary">Add photo</a></div>
+  <p class="help">These photos also appear on Events. Change the order with the number on each photo’s edit page. Drafts stay hidden from visitors.</p>
+  {error ? <p class="msg msg-err" role="alert">Couldn’t load the gallery. Apply migration 003 and check permissions.</p> : photos?.length ? <div class="item-list">{photos.map(photo => <div class="item-row"><img class="thumb" src={imageUrl(photo.image_path)} alt="" loading="lazy"/><div><div class="item-title">{photo.title}</div><div class="item-meta">/{photo.slug} · order {photo.display_order}</div></div><span class={`badge badge-${photo.status}`}>{photo.status}</span><div class="row-actions"><a class="btn btn-sm" href={`/admin/gallery/${photo.id}/`}>Edit</a></div></div>)}</div> : <p class="help">No photos yet. Add one to start the gallery.</p>}
+</AdminLayout>

@@ -1,0 +1,27 @@
+---
+import '@fontsource/source-sans-3/400.css';
+import '@fontsource/source-sans-3/600.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/600.css';
+import '../styles/global.css';
+import '../styles/editorial.css';
+import { getSiteSettings } from '../lib/site-content';
+const {title = 'Home', description = 'Samuel Khawsigan, IT diploma student in Kuala Lumpur. Web pentesting, LLM security, reverse engineering and homelab notes.'} = Astro.props;
+const settings = await getSiteSettings();
+const path = Astro.url.pathname;
+const origin = import.meta.env.PUBLIC_SITE_URL;
+const nav = [['/', 'Home'], ['/profile/', 'Profile'], ['/projects/', 'Work'], ['/events/', 'Events'], ['/gallery/', 'Gallery'], ['/blog/', 'Blog']];
+const active = (url: string) => url === '/' ? path === '/' : path === url.slice(0, -1) || path.startsWith(url);
+---
+<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>{title} | Samuel Khawsigan</title><meta name="description" content={description}/>{(title.includes("[PLACEHOLDER]")||title==="404") && <meta name="robots" content="noindex, follow"/>}<meta name="theme-color" content="#101e2a"/><link rel="icon" type="image/svg+xml" href="/favicon.svg"/><link rel="alternate" type="application/rss+xml" title="Samuel Khawsigan’s blog" href="/rss.xml"/>{origin && <link rel="canonical" href={new URL(path, origin)}/>}
+<meta property="og:title" content={`${title} | Samuel Khawsigan`}/><meta property="og:description" content={description}/><meta property="og:type" content="website"/>{origin && <><meta property="og:url" content={new URL(path,origin)}/><meta property="og:image" content={new URL('/og.png', origin)}/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta property="og:image:alt" content="Samuel Khawsigan, cybersecurity portfolio"/><meta name="twitter:image" content={new URL('/og.png',origin)}/></>}<meta name="twitter:title" content={`${title} | Samuel Khawsigan`}/><meta name="twitter:description" content={description}/><meta name="twitter:card" content="summary_large_image"/></head>
+<body><a class="skip" href="#main">Skip to content</a><div class="shell"><header class="site-header"><div class="header-top"><a class="site-name" href="/" aria-label="Samuel Khawsigan, home">Samuel Khawsigan</a><span class="site-context">Cybersecurity / Kuala Lumpur</span></div><nav aria-label="Main navigation">{nav.map(([url,label],index) => <a href={url} aria-current={active(url)?'page':undefined}><span class="nav-num" aria-hidden="true">{String(index+1).padStart(2,'0')}</span><span>{label}</span></a>)}</nav></header>
+<main id="main" tabindex="-1"><slot/></main>
+<footer class="site-footer">
+  <div class="footer-main">
+    <div class="footer-intro"><span class="footer-kicker">END OF PAGE / STAY IN TOUCH</span><h2>{settings.footer_heading}</h2><p>{settings.footer_intro}</p></div>
+    <div class="footer-group"><h3>Find me</h3><div class="footer-actions"><a href={`mailto:${settings.contact_email}`}>Email <span aria-hidden="true">↗</span></a><a href={settings.contact_github} rel="me">GitHub <span aria-hidden="true">↗</span></a><a href={settings.contact_linkedin} rel="me">LinkedIn <span aria-hidden="true">↗</span></a><a href="/rss.xml" type="application/rss+xml">RSS feed <span aria-hidden="true">↗</span></a></div></div>
+  </div>
+  <div class="footer-bottom"><span>© {new Date().getFullYear()} Samuel Khawsigan</span><span>Kuala Lumpur, Malaysia</span><div><a href="/uses/">Uses</a><a href="/contact/">Contact</a><a href="#main">Back to top ↑</a></div></div>
+</footer></div></body></html>
+

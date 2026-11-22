@@ -1,0 +1,30 @@
+---
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import { createPublicBlogClient } from '../../lib/supabase';
+import { renderMarkdown } from '../../lib/markdown';
+
+const client = createPublicBlogClient();
+const result = client && await client.from('posts')
+  .select('title,excerpt,content_md,published_at')
+  .eq('status', 'published')
+  .eq('slug', Astro.params.slug)
+  .maybeSingle();
+const post = result?.data;
+if (!post) Astro.response.status = result?.error ? 503 : 404;
+const html = post && await renderMarkdown(post.content_md);
+---
+<Layout title={post?.title ?? (result?.error ? 'Blog unavailable' : '404')} description={post?.excerpt || undefined}>
+  <p><a class="text-command" href="/blog/">← Blog</a></p>
+  {post ? (
+    <article class="prose blog-post">
+      <h1>{post.title}</h1>
+      {post.published_at && <time class="eyebrow" datetime={post.published_at}>{new Date(post.published_at).toLocaleDateString('en-GB', { dateStyle: 'long', timeZone: 'Asia/Kuala_Lumpur' })}</time>}
+      <div set:html={html} />
+    </article>
+  ) : <h1>{result?.error ? 'Blog unavailable' : 'Post not found'}</h1>}
+</Layout>
+<style>
+  .blog-post { overflow-wrap: anywhere; }
+  .blog-post :global(table) { display: block; overflow-x: auto; max-width: 100%; }
+</style>

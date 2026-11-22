@@ -1,0 +1,9 @@
+---
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import {getCollection} from 'astro:content';
+const entries=await getCollection('writeups');
+const published=entries.filter(e=>!e.data.placeholder);
+const templates=entries.filter(e=>e.data.placeholder);
+---
+<Layout title="Write-ups" description="CTF, crackme and security lab notes from Samuel Khawsigan."><div class="page-head"><h1>Write-ups</h1><small>/ notes, not victory laps</small></div>{published.length===0&&<div class="prose"><p>No write-ups published yet.</p><p>There’s a template below. Actual findings will go here once the notes and screenshots are ready.</p></div>}<div class="project-rows">{[...published,...templates].map(e=><a class="project-row" href={`/write-ups/${e.id}/`}><small>{e.data.placeholder?'T':'W'}</small><span>{e.data.title}</span><small>{e.data.placeholder?'[PLACEHOLDER]':'read notes'}</small></a>)}</div></Layout>

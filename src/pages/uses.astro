@@ -1,0 +1,18 @@
+---
+export const prerender = false;
+import Layout from '../layouts/Layout.astro';
+import { getSiteSettings } from '../lib/site-content';
+const settings = await getSiteSettings();
+const uses = [
+  ['Machine / lab hardware', settings.uses_hardware],
+  ['Distro / operating system', settings.uses_os],
+  ['Editor', settings.uses_editor],
+  ['Terminal / shell', settings.uses_terminal],
+  ['Web pentesting', settings.uses_web],
+  ['Reverse engineering', settings.uses_re],
+  ['Homelab / SIEM', settings.uses_siem],
+];
+---
+<Layout title="Uses" description="Samuel Khawsigan’s tools and setup.">
+  <div class="prose"><div class="eyebrow">/ uses</div><h1>What’s on the desk.</h1><p>{settings.uses_intro}</p><dl>{uses.map(([label,value]) => <><dt>{label}</dt><dd>{value}</dd></>)}</dl></div>
+</Layout>

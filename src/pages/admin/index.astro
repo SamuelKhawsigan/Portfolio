@@ -1,0 +1,85 @@
+---
+export const prerender = false;
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getAdminClient } from '../../lib/auth';
+const supabase = await getAdminClient(Astro);
+if (!supabase) return Astro.redirect('/admin/login/');
+const [posts, projects, gallery, achievements] = await Promise.all([
+  supabase.from('posts').select('id,status', { count: 'exact', head: false }),
+  supabase.from('projects').select('id,status', { count: 'exact', head: false }),
+  supabase.from('gallery_items').select('id,status', { count: 'exact', head: false }),
+  supabase.from('achievement_items').select('id,status', { count: 'exact', head: false }),
+]);
+const makeSummary = (label: string, result: typeof posts, href: string, tone: string, visibleLabel = 'published') => {
+  const value = result.count ?? 0;
+  const published = result.data?.filter(item => item.status === 'published').length ?? 0;
+  return { label, value, published, detail: `${published} ${visibleLabel}`, href, tone };
+};
+const summary = [
+  makeSummary('Blog posts', posts, '/admin/posts/', 'blue'),
+  makeSummary('Projects', projects, '/admin/projects/', 'cyan'),
+  makeSummary('Gallery', gallery, '/admin/gallery/', 'blue', 'visible'),
+  makeSummary('Achievements', achievements, '/admin/achievements/', 'cyan', 'visible'),
+];
+const totalItems = summary.reduce((total, item) => total + item.value, 0);
+const publishedItems = summary.reduce((total, item) => total + item.published, 0);
+const publishRate = totalItems ? Math.round((publishedItems / totalItems) * 100) : 0;
+const ring = 283;
+const publishedArc = (ring * publishRate) / 100;
+const draftArc = ring - publishedArc;
+const maxItems = Math.max(...summary.map(item => item.value), 1);
+---
+<AdminLayout title="Overview">
+  <div class="dashboard-head">
+    <div><p class="overline">Portfolio control room</p><h1>Good to see you.</h1><p class="help">Your published changes are live without a redeploy.</p></div>
+    <a href="/admin/posts/new" class="btn btn-primary">New blog post</a>
+  </div>
+  <section class="stats" aria-label="Content totals">
+    {summary.map(item => <a href={item.href} class={`dashboard-card-button stat-card ${item.tone}`}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}<b aria-hidden="true">↗</b></small></a>)}
+  </section>
+  <section class="visual-grid" aria-label="Content overview">
+    <article class="chart-panel publication-chart">
+      <div class="panel-heading"><div><p class="overline">Publishing status</p><h2>Content in circulation</h2></div><span class="live-dot">Live data</span></div>
+      <div class="donut-layout">
+        <div class="donut-wrap" role="img" aria-label={`${publishRate}% of your portfolio content is published`}>
+          <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="donut-track" cx="60" cy="60" r="45"/><circle class="donut-published" cx="60" cy="60" r="45" pathLength="283" stroke-dasharray={`${publishedArc} ${draftArc}`} /></svg>
+          <div><strong>{publishRate}%</strong><small>published</small></div>
+        </div>
+        <div class="chart-legend"><p><i class="legend-published"></i><span>Published</span><strong>{publishedItems}</strong></p><p><i class="legend-draft"></i><span>Drafts</span><strong>{totalItems - publishedItems}</strong></p><small>Content is only visible to visitors after you publish it.</small></div>
+      </div>
+    </article>
+    <article class="chart-panel content-chart">
+      <div class="panel-heading"><div><p class="overline">Library balance</p><h2>What is on the site</h2></div><span class="chart-total">{totalItems} items</span></div>
+      <div class="bar-chart" role="img" aria-label="Bar chart showing the number of blog posts, projects, gallery items, and achievements">
+        {summary.map(item => <a href={item.href} class="bar-row dashboard-chart-button"><span>{item.label}</span><div class="bar-track"><i class={`bar-fill ${item.tone}`} style={`--bar-size:${(item.value / maxItems) * 100}%`}></i></div><strong>{item.value}</strong></a>)}
+      </div>
+    </article>
+  </section>
+  <section class="dashboard-grid">
+    <article class="action-panel">
+      <div class="panel-heading"><div><p class="overline">Quick actions</p><h2>Keep it current</h2></div></div>
+      <div class="quick-actions">
+        <a class="dashboard-action-button" href="/admin/posts/new"><span>01</span><div><strong>Write a blog post</strong><small>Draft first, publish when it is ready.</small></div><b aria-hidden="true">↗</b></a>
+        <a class="dashboard-action-button" href="/admin/gallery/new/"><span>02</span><div><strong>Add an event photo</strong><small>Upload, caption, and choose its gallery order.</small></div><b aria-hidden="true">↗</b></a>
+        <a class="dashboard-action-button" href="/admin/projects/"><span>03</span><div><strong>Update a project</strong><small>Document the problem, approach, and what happened.</small></div><b aria-hidden="true">↗</b></a>
+      </div>
+    </article>
+    <article class="action-panel editor-panel">
+      <p class="overline">Site content</p><h2>Words, links, profile</h2>
+      <p>Update your introduction, setup, contact details, portrait, and footer from one place.</p>
+      <a href="/admin/site/" class="btn">Open site text <span aria-hidden="true">↗</span></a>
+    </article>
+  </section>
+  <section class="admin-tiles" aria-label="All editor sections">
+    <a class="dashboard-card-button" href="/admin/posts/"><strong>Blog posts</strong><span>Markdown, drafts, publishing, and image upload.</span><b aria-hidden="true">↗</b></a>
+    <a class="dashboard-card-button" href="/admin/projects/"><strong>Projects</strong><span>Problem, approach, tools, results, and evidence.</span><b aria-hidden="true">↗</b></a>
+    <a class="dashboard-card-button" href="/admin/gallery/"><strong>Gallery</strong><span>Photos, captions, visibility, and order.</span><b aria-hidden="true">↗</b></a>
+    <a class="dashboard-card-button" href="/admin/achievements/"><strong>Achievements</strong><span>Completions, workshops, and CTF records.</span><b aria-hidden="true">↗</b></a>
+  </section>
+</AdminLayout>
+<style>
+  .dashboard-head{display:flex;gap:1rem;align-items:flex-start;justify-content:space-between;margin-bottom:2rem}.dashboard-head h1{margin:.1rem 0 .35rem}.overline{margin:0;color:var(--accent);font:.7rem var(--mono);letter-spacing:.08em;text-transform:uppercase}.dashboard-head .help{margin:0}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-bottom:1rem}.stat-card{min-height:140px;padding:1.1rem;border:1px solid var(--line);border-radius:8px;background:var(--pane);display:flex;flex-direction:column}.dashboard-card-button{position:relative;text-decoration:none;color:inherit;overflow:hidden;box-shadow:0 1px 0 #ffffff0a inset;transition:transform 180ms ease,border-color 180ms ease,background-color 180ms ease,box-shadow 180ms ease}.dashboard-card-button::after{content:'↗';position:absolute;right:1rem;top:.9rem;color:var(--accent);opacity:0;transform:translate(-4px,4px);transition:opacity 180ms ease,transform 180ms ease}.dashboard-card-button:hover,.dashboard-card-button:focus-visible{transform:translateY(-3px);border-color:var(--accent);background:var(--pane-raised);box-shadow:0 12px 26px #0000002b;color:inherit}.dashboard-card-button:hover::after,.dashboard-card-button:focus-visible::after{opacity:1;transform:translate(0,0)}.stat-card span,.stat-card small{color:var(--muted);font-size:.8rem}.stat-card small{display:flex;justify-content:space-between;gap:.5rem}.stat-card small b{font-weight:400;color:var(--accent);opacity:0;transition:opacity 180ms ease}.stat-card:hover small b,.stat-card:focus-visible small b{opacity:1}.stat-card strong{font:600 clamp(2rem,4vw,3.2rem)/1 var(--mono);margin:auto 0 .55rem}.stat-card.cyan strong{color:var(--accent)}.visual-grid{display:grid;grid-template-columns:minmax(300px,.8fr) minmax(400px,1.2fr);gap:1rem}.chart-panel{padding:1.4rem;border:1px solid var(--line);border-radius:8px;background:var(--pane);min-width:0}.panel-heading{display:flex;gap:1rem;align-items:flex-start;justify-content:space-between}.panel-heading h2,.editor-panel h2{margin:.4rem 0 1.15rem;font-size:1.25rem}.live-dot,.chart-total{font:.68rem var(--mono);color:var(--success);border:1px solid #7dd0a755;border-radius:999px;padding:.25rem .45rem;white-space:nowrap}.chart-total{color:var(--muted);border-color:var(--line)}.donut-layout{display:flex;gap:1.5rem;align-items:center}.donut-wrap{display:grid;place-items:center;position:relative;width:146px;aspect-ratio:1;flex:none}.donut-wrap svg{position:absolute;inset:0;transform:rotate(-90deg)}.donut-wrap circle{fill:none;stroke-width:10}.donut-track{stroke:#263746}.donut-published{stroke:var(--accent);stroke-linecap:round;transition:stroke-dasharray 700ms ease}.donut-wrap>div{display:flex;flex-direction:column;align-items:center}.donut-wrap strong{font:600 1.6rem/1 var(--mono)}.donut-wrap small{color:var(--muted);font-size:.7rem;margin-top:.3rem}.chart-legend{min-width:0;flex:1}.chart-legend p{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.55rem;align-items:center;padding:.45rem 0;margin:0;border-bottom:1px solid var(--line)}.chart-legend i{width:8px;height:8px;border-radius:50%;background:var(--accent)}.chart-legend .legend-draft{background:#516471}.chart-legend span{color:var(--muted);font-size:.88rem}.chart-legend strong{font:600 .86rem var(--mono)}.chart-legend>small{display:block;color:var(--muted);font-size:.74rem;margin-top:.85rem}.bar-chart{display:grid;gap:.65rem;margin-top:.75rem}.bar-row{display:grid;grid-template-columns:92px minmax(0,1fr) 2.2rem;align-items:center;gap:.7rem;color:inherit;padding:.45rem .5rem;border:1px solid transparent;border-radius:6px;text-decoration:none;transition:background-color 160ms ease,border-color 160ms ease,transform 160ms ease}.dashboard-chart-button:hover,.dashboard-chart-button:focus-visible{color:inherit;border-color:var(--line);background:var(--pane-raised);transform:translateX(3px)}.bar-row>span{font-size:.8rem;color:var(--muted)}.bar-row>strong{font:.75rem var(--mono);text-align:right}.bar-track{height:9px;border-radius:99px;background:#20303d;overflow:hidden}.bar-fill{display:block;width:var(--bar-size);height:100%;border-radius:inherit;background:var(--accent);transform-origin:left;animation:bar-in 620ms ease both}.bar-fill.blue{background:#74c6f2}.bar-fill.cyan{background:#8fd4c4}.dashboard-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(250px,.8fr);gap:1rem;margin:1rem 0}.action-panel{padding:1.4rem;border:1px solid var(--line);border-radius:8px;background:var(--pane)}.quick-actions{border-top:1px solid var(--line)}.quick-actions a{display:grid;grid-template-columns:2.25rem minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.95rem .65rem;border-bottom:1px solid var(--line);border-radius:6px;text-decoration:none;transition:background-color 160ms ease,transform 160ms ease}.quick-actions a:hover,.quick-actions a:focus-visible{color:inherit;background:var(--pane-raised);transform:translateX(3px)}.quick-actions a:hover strong{color:var(--accent)}.quick-actions span{color:var(--accent);font:.72rem var(--mono)}.quick-actions small{display:block;color:var(--muted);margin-top:.15rem}.quick-actions b{color:var(--accent)}.editor-panel{background:linear-gradient(145deg,#152838,#111923)}.editor-panel p:not(.overline){color:var(--muted);max-width:30ch;margin:0 0 1.5rem}.admin-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-top:1rem}.admin-tiles a{display:flex;flex-direction:column;gap:.7rem;min-height:160px;padding:1.15rem;border:1px solid var(--line);border-radius:8px;background:var(--pane)}.admin-tiles strong{font-size:1.05rem}.admin-tiles span{color:var(--muted)}.admin-tiles b{margin-top:auto;color:var(--accent)}@keyframes bar-in{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  .admin-tiles span{color:var(--muted)}
+  .admin-tiles b{margin-top:auto;color:var(--accent)}
+  @media(max-width:1050px){.visual-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-grid{grid-template-columns:1fr}}@media(max-width:560px){.dashboard-head{align-items:stretch;flex-direction:column}.stats,.admin-tiles{grid-template-columns:1fr}.stat-card{min-height:116px}.admin-tiles a{min-height:0}.donut-layout{align-items:flex-start;flex-direction:column}.bar-row{grid-template-columns:78px minmax(0,1fr) 2rem}}
+</style>

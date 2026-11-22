@@ -1,0 +1,133 @@
+{
+  "completions": [
+    {
+      "title": "Jr Penetration Tester Learning Path",
+      "issuer": "TryHackMe",
+      "type": "Learning path completion",
+      "date": "23 June 2026",
+      "image": "thm-junior-pentester",
+      "alt": "TryHackMe certificate confirming Samuel Khawsigan completed the Jr Penetration Tester Learning Path on 23 June 2026.",
+      "width": 487,
+      "height": 345
+    },
+    {
+      "title": "Introduction to Critical Infrastructure Protection",
+      "issuer": "OPSWAT Academy",
+      "type": "Program completion",
+      "date": "Issued 09/03/2026, as printed",
+      "image": "opswat-cip",
+      "alt": "OPSWAT Academy Introduction to Critical Infrastructure Protection completion certificate for Samuel Khawsigan.",
+      "width": 1280,
+      "height": 1010
+    },
+    {
+      "title": "GitHub Foundations",
+      "issuer": "DataCamp",
+      "type": "Course completion, 9 hours",
+      "date": "29 September 2026",
+      "image": "datacamp-github",
+      "alt": "DataCamp statement of accomplishment for Samuel Khawsigan, GitHub Foundations, completed 29 September 2026.",
+      "width": 1287,
+      "height": 742
+    },
+    {
+      "title": "Intermediate Git",
+      "issuer": "DataCamp",
+      "type": "Course completion, 2 hours",
+      "date": "29 September 2026",
+      "image": "datacamp-git",
+      "alt": "DataCamp statement of accomplishment for Samuel Khawsigan, Intermediate Git, completed 29 September 2026.",
+      "width": 1287,
+      "height": 742
+    }
+  ],
+  "participation": [
+    {
+      "title": "Pwn.exe / AI: IoT Exploitation with Ollama + MCP",
+      "issuer": "Asia Pacific University",
+      "type": "Workshop participation",
+      "date": "19 July 2026",
+      "image": "apu-pwnexe-workshop",
+      "alt": "APU certificate of participation for Samuel Khawsigan in the Pwn.exe AI IoT exploitation workshop on 19 July 2026.",
+      "width": 491,
+      "height": 347
+    }
+  ],
+  "ctf": [
+    {
+      "title": "Global Cyber Skills Benchmark 2026: Project Nightfall",
+      "issuer": "Hack The Box",
+      "type": "Team orient, 226th of 589 teams",
+      "date": "15–20 May 2026",
+      "detail": "66 of 126 challenges solved. Team total: 35,950 points.",
+      "image": "htb-nightfall",
+      "alt": "Hack The Box participation result for Samuel Khawsigan and team orient, Project Nightfall 2026: team rank 226, 66 challenges solved and 35,950 points.",
+      "width": 491,
+      "height": 347
+    },
+    {
+      "title": "Cyber Apocalypse CTF 2026: The Salt Crown",
+      "issuer": "Hack The Box",
+      "type": "Team orient, 566th of 6,744 teams",
+      "date": "24–29 July 2026",
+      "detail": "46 of 136 challenges solved. Team total: 26,925 points.",
+      "image": "htb-cyber-apocalypse",
+      "alt": "Hack The Box Cyber Apocalypse 2026 participation result for Samuel Khawsigan and team orient: team rank 566, 46 challenges solved and 26,925 points.",
+      "width": 491,
+      "height": 347
+    },
+    {
+      "title": "Holmes CTF 2026: The Reichenbach Directive",
+      "issuer": "Hack The Box",
+      "type": "Team orient, 980th of 5,637 teams",
+      "date": "17–21 September 2026",
+      "detail": "13 of 111 challenges solved. Team total: 1,100 points.",
+      "image": "htb-holmes",
+      "alt": "Hack The Box Holmes CTF 2026 participation result for Samuel Khawsigan and team orient: team rank 980, 13 challenges solved and 1,100 points.",
+      "width": 1600,
+      "height": 1131
+    }
+  ],
+  "photos": [
+    {
+      "title": "Builders & Brews, Hack Edition",
+      "summary": "A builder event hosted by Nebius and Tavily.",
+      "image": "builders-and-brews",
+      "alt": "Samuel beside a Nebius and Tavily Builders and Brews Hack Edition banner.",
+      "width": 744,
+      "height": 992
+    },
+    {
+      "title": "AWS",
+      "summary": "An industry visit to AWS.",
+      "image": "aws-photo",
+      "alt": "Samuel seated in front of an AWS display.",
+      "width": 800,
+      "height": 1066
+    },
+    {
+      "title": "Alibaba Cloud Qwen AI 101 Workshop",
+      "summary": "An introductory workshop on Alibaba Cloud’s Qwen models.",
+      "image": "qwen-workshop",
+      "alt": "Samuel with another attendee in front of the Alibaba Cloud Qwen AI 101 Workshop presentation.",
+      "width": 800,
+      "height": 1066
+    },
+    {
+      "title": "Microsoft",
+      "summary": "An industry visit to Microsoft.",
+      "image": "microsoft-photo",
+      "alt": "Samuel and three other people posing in front of a Microsoft sign.",
+      "width": 800,
+      "height": 1067
+    },
+    {
+      "title": "Exabytes GROW AI Summit 2026",
+      "summary": "A community summit focused on AI.",
+      "image": "grow-ai-summit",
+      "alt": "Samuel and three other people in front of the Exabytes GROW AI Summit 2026 event backdrop.",
+      "width": 1080,
+      "height": 718
+    }
+  ]
+}

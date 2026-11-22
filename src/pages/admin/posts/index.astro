@@ -1,0 +1,44 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getAdminClient } from '../../../lib/auth';
+
+const supabase = await getAdminClient(Astro);
+if (!supabase) return Astro.redirect('/admin/login/');
+
+const { data: posts, error } = await supabase
+  .from('posts')
+  .select('id,slug,title,status,category,published_at,updated_at')
+  .order('updated_at', { ascending: false });
+---
+<AdminLayout title="Posts">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
+    <h1 style="margin:0">Blog posts</h1>
+    <a href="/admin/posts/new" class="btn btn-primary">New post</a>
+  </div>
+
+  {error && <p class="msg msg-err" role="alert">Couldn’t load posts. Check the blog database and try again.</p>}
+
+  {posts && posts.length > 0 ? (
+    <div class="item-list">
+      {posts.map(post => (
+        <div class="item-row">
+          <div>
+            <div class="item-title">{post.title}</div>
+            <div class="item-meta">
+              /{post.slug} &nbsp;·&nbsp; {post.category}
+              {post.published_at && <> &nbsp;·&nbsp; {new Date(post.published_at).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}</>}
+            </div>
+          </div>
+          <span class={`badge badge-${post.status}`}>{post.status}</span>
+          <div style="display:flex;gap:.5rem">
+            {post.status === 'published' && <a href={`/blog/${encodeURIComponent(post.slug)}/`} class="btn btn-sm">View</a>}
+            <a href={`/admin/posts/${post.id}`} class="btn btn-sm">Edit</a>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : !error && (
+    <p style="color:var(--muted);font-size:.88rem">No posts yet.</p>
+  )}
+</AdminLayout>

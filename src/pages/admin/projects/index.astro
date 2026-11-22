@@ -1,0 +1,15 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getAdminClient } from '../../../lib/auth';
+const supabase = await getAdminClient(Astro);
+if (!supabase) return Astro.redirect('/admin/login/');
+const { data: projects, error } = await supabase.from('projects')
+  .select('id,slug,title,status,featured,display_order,updated_at')
+  .order('display_order', { ascending: true });
+---
+<AdminLayout title="Projects">
+  <div class="page-actions"><h1>Projects</h1><a href="/admin/projects/new/" class="btn btn-primary">Add project</a></div>
+  <p class="help">Drafts stay out of the public project list. The four original placeholder pages remain until you publish matching projects or replace them in the site files.</p>
+  {error ? <p class="msg msg-err" role="alert">Couldn’t load projects. Apply migration 005 and check permissions.</p> : projects?.length ? <div class="item-list">{projects.map(project => <div class="item-row"><div><div class="item-title">{project.title}</div><div class="item-meta">/{project.slug} · order {project.display_order}{project.featured ? ' · featured' : ''}</div></div><span class={`badge badge-${project.status}`}>{project.status}</span><div class="row-actions"><a class="btn btn-sm" href={`/admin/projects/${project.id}/`}>Edit</a></div></div>)}</div> : <p class="help">No projects yet.</p>}
+</AdminLayout>

@@ -1,0 +1,90 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getAdminClient } from '../../../lib/auth';
+import { uploadPortfolioImage } from '../../../lib/admin-media';
+
+const supabase = await getAdminClient(Astro);
+if (!supabase) return Astro.redirect('/admin/login/');
+const id = Astro.params.id ?? '';
+const isNew = id === 'new';
+const validId = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id);
+const loaded = !isNew && validId ? await supabase.from('gallery_items').select('*').eq('id', id).maybeSingle() : null;
+const existing = loaded?.data;
+if (!isNew && !existing) Astro.response.status = loaded?.error ? 503 : 404;
+
+let values = existing ?? { slug: '', title: '', summary: '', alt: '', image_path: '', width: null, height: null, display_order: 60, status: 'draft' };
+let error = '';
+const imageUrl = (path: string) => path.startsWith('/') ? path
+  : supabase.storage.from('portfolio-gallery').getPublicUrl(path).data.publicUrl;
+
+if (Astro.request.method === 'POST' && (isNew || existing)) {
+  const origin = Astro.request.headers.get('origin');
+  if (origin && origin !== Astro.url.origin) {
+    error = 'This request did not come from the gallery editor.';
+  } else {
+    const form = await Astro.request.formData();
+    const read = (key: string) => String(form.get(key) ?? '').trim();
+    values = {
+      ...values, slug: existing?.status === 'published' ? existing.slug : read('slug').toLowerCase(), title: read('title'), summary: read('summary'),
+      alt: read('alt'), display_order: Number(read('display_order')), status: read('status'),
+      width: read('width') ? Number(read('width')) : null,
+      height: read('height') ? Number(read('height')) : null,
+    };
+    const file = form.get('photo');
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(values.slug) || values.slug.length > 100 ||
+        !values.title || values.title.length > 160 || !values.alt || values.alt.length > 300 ||
+        values.summary.length > 500 || !Number.isInteger(values.display_order) || Math.abs(values.display_order) > 100000 ||
+        !['draft', 'published'].includes(values.status) ||
+        (values.width !== null && (!Number.isInteger(values.width) || values.width < 1 || values.width > 20000)) ||
+        (values.height !== null && (!Number.isInteger(values.height) || values.height < 1 || values.height > 20000))) {
+      error = 'Check the title, URL slug, description, alt text, order and image dimensions.';
+    } else if (isNew && !(file instanceof File && file.size > 0)) {
+      error = 'Choose a photo to upload.';
+    } else {
+      let uploadedPath = '';
+      if (file instanceof File && file.size > 0) {
+        const upload = await uploadPortfolioImage(supabase, file);
+        error = upload.error;
+        uploadedPath = upload.path;
+        if (uploadedPath) { values.image_path = uploadedPath; values.width = upload.width ?? null; values.height = upload.height ?? null; }
+      }
+      if (!error) {
+        const row = { slug: values.slug, title: values.title, summary: values.summary,
+          alt: values.alt, image_path: values.image_path, width: values.width, height: values.height,
+          display_order: values.display_order, status: values.status, updated_at: new Date().toISOString() };
+        const save = isNew ? await supabase.from('gallery_items').insert(row).select('id').single()
+          : await supabase.from('gallery_items').update(row).eq('id', id).select('id').maybeSingle();
+        if (save.data) return Astro.redirect(`/admin/gallery/${save.data.id}/?saved=1`, 303);
+        if (uploadedPath) await supabase.storage.from('portfolio-gallery').remove([uploadedPath]);
+        error = save.error?.code === '23505' ? 'That URL slug is already in use.' : 'Couldn’t save the photo. Check database permissions and try again.';
+      }
+    }
+  }
+  if (error && Astro.response.status === 200) Astro.response.status = 400;
+}
+---
+<AdminLayout title={isNew ? 'Add photo' : 'Edit photo'}>
+  <p><a href="/admin/gallery/">← All photos</a></p>
+  {isNew || existing ? <>
+    <h1>{isNew ? 'Add photo' : 'Edit photo'}</h1>
+    {error ? <p class="msg msg-err" role="alert">{error}</p> : Astro.url.searchParams.has('saved') && <p class="msg msg-ok" role="status">Photo saved.</p>}
+    {values.image_path && <img class="photo-preview" src={imageUrl(values.image_path)} alt={values.alt || 'Current gallery photo'} />}
+    <form method="POST" enctype="multipart/form-data">
+      <div class="field"><label for="photo">{isNew ? 'Photo' : 'Replace photo (optional)'}</label><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required={isNew}/><small>JPEG, PNG or WebP, maximum 8 MB. Remove private details before uploading.</small></div>
+      <div class="field-row"><div class="field"><label for="title">Title</label><input id="title" name="title" value={values.title} maxlength="160" required/></div><div class="field"><label for="slug">URL anchor</label><input id="slug" name="slug" value={values.slug} maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" readonly={existing?.status === 'published'} required/></div></div>
+      <div class="field"><label for="summary">Event summary</label><textarea id="summary" name="summary" rows="3" maxlength="500">{values.summary}</textarea></div>
+      <div class="field"><label for="alt">Image description for screen readers</label><input id="alt" name="alt" value={values.alt} maxlength="300" required/></div>
+      <div class="field-row"><div class="field"><label for="display_order">Order (smallest first)</label><input id="display_order" name="display_order" type="number" value={values.display_order} min="-100000" max="100000" required/></div><div class="field"><label for="status">Visibility</label><select id="status" name="status"><option value="draft" selected={values.status === 'draft'}>Draft</option><option value="published" selected={values.status === 'published'}>Published</option></select></div></div>
+      <details><summary>Image dimensions (optional)</summary><div class="field-row"><div class="field"><label for="width">Width in pixels</label><input id="width" name="width" type="number" value={values.width ?? ''} min="1" max="20000"/></div><div class="field"><label for="height">Height in pixels</label><input id="height" name="height" type="number" value={values.height ?? ''} min="1" max="20000"/></div></div></details>
+      <div class="form-actions"><button class="btn btn-primary" type="submit">Save photo</button>{!isNew && values.status === 'published' && <a class="btn" href={`/gallery/#${values.slug}`}>View in gallery ↗</a>}</div>
+    </form>
+  </> : <h1>{loaded?.error ? 'Couldn’t load photo' : 'Photo not found'}</h1>}
+</AdminLayout>
+<style>
+  .photo-preview{display:block;max-width:100%;max-height:320px;object-fit:contain;margin:0 0 1.5rem;border:1px solid var(--line)}
+  .field small{display:block;color:var(--muted);margin-top:.35rem}
+  details{margin:1.2rem 0;border-top:1px solid var(--line);padding-top:.8rem}
+  summary{cursor:pointer;color:var(--accent)}
+  details .field-row{margin-top:1rem}
+</style>

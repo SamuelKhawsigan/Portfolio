@@ -1,0 +1,22 @@
+---
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+import AchievementRecords from '../../components/AboutEvidence.astro';
+import {getCollection} from 'astro:content';
+import { getPublicProjects } from '../../lib/site-content';
+const entries = (await getCollection('projects')).sort((a,b)=>a.id.localeCompare(b.id));
+const managed = await getPublicProjects();
+const visible = [
+  ...managed.map(project => ({ slug: project.slug, title: project.title, placeholder: false })),
+  ...entries.filter(entry => !managed.some(project => project.slug === entry.id))
+    .map(entry => ({ slug: entry.id, title: entry.data.title, placeholder: entry.data.placeholder })),
+];
+---
+<Layout title="Achievements & Projects" description="Samuel Khawsigan’s cybersecurity projects, course completions and CTF results.">
+  <div class="page-head"><h1>Achievements &amp; Projects</h1></div>
+  <AchievementRecords/>
+  <section class="evidence-archive" aria-labelledby="projects-heading">
+    <div class="section-heading"><h2 id="projects-heading">Projects</h2></div>
+    <div class="project-rows">{visible.map((entry,i)=><a class="project-row" href={`/projects/${entry.slug}/`}><small>0{i+1}</small><span>{entry.title}</span><small>{entry.placeholder?'[ DRAFT ]':'project notes'}</small></a>)}</div>
+  </section>
+</Layout>

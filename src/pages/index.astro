@@ -1,0 +1,163 @@
+---
+export const prerender = false;
+import Layout from '../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+import { getAchievements, getGalleryPhotos, getPublicProjects, getSiteSettings, publicImageUrl } from '../lib/site-content';
+
+const [settings, photos, achievements, managedProjects] = await Promise.all([getSiteSettings(), getGalleryPhotos(), getAchievements(), getPublicProjects()]);
+const projects = await getCollection('projects', ({ data }) => !data.placeholder);
+const featured = projects.find(({ data }) => data.featured) ?? projects[0];
+const managedFeatured = managedProjects.find(project => project.featured) ?? managedProjects[0];
+const nightfall = achievements.find(({ slug }) => slug === 'htb-nightfall') ?? achievements.find(({ category }) => category === 'ctf');
+const nightfallHeading = nightfall?.title.includes(':') ? nightfall.title.split(':').at(-1)?.trim() : nightfall?.title;
+const summit = photos.find(({ slug }) => slug === 'grow-ai-summit') ?? photos.at(-1);
+---
+<Layout>
+  <section class="portrait-intro" aria-labelledby="name">
+    <div>
+      <p class="edition-label">01 / Kuala Lumpur, Malaysia</p>
+      <h1 id="name">Samuel<br />Khawsigan</h1>
+      <p class="intro-copy">{settings.home_intro}</p>
+      <a class="editorial-link" href="/profile/">Read my profile <span aria-hidden="true">↗</span></a>
+    </div>
+    <figure>
+      <img src={publicImageUrl(settings.profile_portrait_path) ?? '/images/about/samuel-portrait.webp'} alt={settings.profile_portrait_alt} width="640" height="640" fetchpriority="high" />
+      <figcaption>{settings.home_portrait_caption}</figcaption>
+    </figure>
+  </section>
+
+  <section class="home-section" aria-labelledby="work-title">
+    <div class="section-top"><div><span class="section-number">02 / SELECTED WORK</span><h2 id="work-title">{settings.home_work_heading}</h2></div><a class="editorial-link" href="/projects/">All work <span aria-hidden="true">↗</span></a></div>
+    {managedFeatured ? (
+      <article class="work-feature"><div><p class="edition-label">Featured project</p><h3>{managedFeatured.title}</h3><p>{managedFeatured.description}</p><a class="editorial-link" href={`/projects/${managedFeatured.slug}/`}>Read project <span aria-hidden="true">↗</span></a></div>{managedFeatured.cover_image && <figure><img src={publicImageUrl(managedFeatured.cover_image) ?? undefined} alt={managedFeatured.cover_alt ?? ''} loading="lazy" decoding="async" /></figure>}</article>
+    ) : featured ? (
+      <article class="work-feature">
+        <div>
+          <p class="edition-label">Featured project</p>
+          <h3>{featured.data.title}</h3>
+          <p>{featured.data.description}</p>
+          <a class="editorial-link" href={`/projects/${featured.id}/`}>Read project <span aria-hidden="true">↗</span></a>
+        </div>
+      </article>
+    ) : nightfall && (
+      <article class="work-feature">
+        <div>
+          <p class="edition-label">{nightfall.issuer} · {nightfall.date}</p>
+          <h3>{nightfallHeading}</h3>
+          <p>{nightfall.type}</p>
+          <p>{nightfall.detail}</p>
+          <a class="editorial-link" href={`/projects/#${nightfall.slug}`}>See the competition record <span aria-hidden="true">↗</span></a>
+        </div>
+        <figure><img src={nightfall.src} alt={nightfall.alt} width={nightfall.width ?? undefined} height={nightfall.height ?? undefined} loading="lazy" decoding="async" /><figcaption>Actual participation record.</figcaption></figure>
+      </article>
+    )}
+  </section>
+
+  {summit && (
+    <section class="home-section" aria-labelledby="events-title">
+      <div class="section-top"><div><span class="section-number">03 / OUTSIDE THE LAB</span><h2 id="events-title">{settings.home_events_heading}</h2></div><a class="editorial-link" href="/events/">Events <span aria-hidden="true">↗</span></a></div>
+      <figure class="summit-photo">
+        <a href={`/gallery/#${summit.slug}`} aria-label={`See ${summit.title} in the gallery`}>
+          <img src={summit.src} alt={summit.alt} width={summit.width ?? undefined} height={summit.height ?? undefined} loading="lazy" decoding="async" />
+        </a>
+        <figcaption><span>{summit.title}</span><a class="editorial-link" href={`/gallery/#${summit.slug}`}>View gallery <span aria-hidden="true">↗</span></a></figcaption>
+      </figure>
+    </section>
+  )}
+
+  <section class="home-section journal" aria-labelledby="journal-title">
+    <div><span class="section-number">04 / NOTES</span><h2 id="journal-title">{settings.home_notes_heading}</h2><p>{settings.home_notes_intro}</p></div>
+    <a class="editorial-link" href="/blog/">Read the blog <span aria-hidden="true">↗</span></a>
+  </section>
+</Layout>
+
+<style>
+  .portrait-intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr);
+    gap: 0;
+    padding: 0;
+    min-height: 470px;
+    align-items: stretch;
+    background: var(--paper);
+    color: var(--paper-ink);
+    overflow: hidden;
+  }
+  .portrait-intro > div {
+    display: flex;
+    flex-direction: column;
+    padding: clamp(2rem, 4vw, 4rem);
+  }
+  .portrait-intro .edition-label { color: #536874; }
+  .portrait-intro h1 {
+    font-size: clamp(3.4rem, 6.8vw, 6.4rem);
+    line-height: .88;
+    letter-spacing: -.075em;
+    margin: 2.7rem 0 2rem;
+  }
+  .portrait-intro .intro-copy { color: #3f5663; max-width: 36ch; font-size: clamp(1.15rem, 1.8vw, 1.4rem); line-height: 1.42; border-bottom: 1px solid #a5b8c2; padding-bottom: 1.5rem; }
+  .portrait-intro .editorial-link { display: inline-flex; align-self: flex-start; margin-top: .2rem; padding: .72rem 1.05rem; border: 1px solid var(--paper-ink); background: var(--paper-ink); color: var(--paper); }
+  .portrait-intro .editorial-link:hover, .portrait-intro .editorial-link:focus-visible { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--paper-ink); }
+  .portrait-intro figure { position: relative; margin: 0; height: 100%; background: var(--pane); }
+  .portrait-intro figure::before { inset: 1rem; border-color: var(--paper); z-index: 1; }
+  .portrait-intro img { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; border-radius: 0; filter: saturate(.85); }
+  .portrait-intro figcaption {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    padding: .35rem .5rem;
+    background: var(--bg);
+    color: var(--ink);
+    font: .72rem/1.4 var(--mono);
+    z-index: 2;
+  }
+  figure { margin: 0; }
+  img { display: block; max-width: 100%; }
+  .home-section { margin-top: clamp(4.5rem, 8vw, 7rem); }
+  .portrait-intro + .home-section { margin-top: clamp(3rem, 4vw, 4rem); }
+  .section-top, .journal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem 2rem; }
+  .section-top { align-items: end; padding-bottom: 1.5rem; border-bottom: 1px solid var(--line); }
+  .section-number { display: block; color: var(--accent); font: 600 .72rem/1.5 var(--mono); letter-spacing: .08em; margin-bottom: .8rem; }
+  .section-top h2, .journal h2 { font: 600 clamp(2rem, 4vw, 3.4rem)/1.05 var(--sans); letter-spacing: -.04em; margin: 0; }
+  .work-feature {
+    display: grid;
+    grid-template-columns: minmax(0, .75fr) minmax(0, 1.25fr);
+    gap: clamp(2rem, 6vw, 6rem);
+    align-items: center;
+    background: transparent;
+    border-radius: 0;
+    padding: clamp(2rem, 4vw, 4rem) 0;
+    margin-top: 0;
+  }
+  .work-feature > div { max-width: 390px; }
+  .work-feature h3 { font: 600 clamp(2.8rem, 5vw, 5rem)/.98 var(--sans); letter-spacing: -.055em; margin: 0 0 1.5rem; }
+  .work-feature p, .journal p { color: var(--muted); max-width: 50ch; }
+  .work-feature strong { color: var(--ink); }
+  .work-feature figure { min-width: 0; }
+  .work-feature img { width: 100%; height: auto; border: 1px solid var(--line); }
+  .work-feature figcaption { color: var(--muted); font: .75rem/1.5 var(--mono); margin-top: .8rem; }
+  .summit-photo { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(190px, .5fr); align-items: end; gap: clamp(1.5rem, 5vw, 4rem); max-width: none; margin: 2rem 0 0; }
+  .summit-photo a { display: block; text-decoration: none; }
+  .summit-photo img { width: 100%; max-height: 550px; object-fit: cover; object-position: center 30%; border-radius: 0; }
+  .summit-photo figcaption { display: flex; flex-direction: column; align-items: flex-start; gap: 1.5rem; font: 600 clamp(1.3rem, 2vw, 1.8rem)/1.2 var(--sans); color: var(--ink); padding: 0 0 .4rem; }
+  .journal { border-top: 1px solid var(--line); padding-top: 1.3rem; }
+  .journal p { font-size: 1.15rem; margin: .5rem 0 0; }
+  @media (max-width: 800px) {
+    .portrait-intro { min-height: 0; }
+    .portrait-intro > div { padding: clamp(1.8rem, 4vw, 3rem); }
+    .portrait-intro h1 { font-size: clamp(3rem, 8vw, 5rem); margin: 3rem 0 2rem; }
+    .work-feature { gap: 2rem; }
+  }
+  @media (max-width: 680px) {
+    .portrait-intro, .work-feature, .summit-photo { grid-template-columns: 1fr; }
+    .portrait-intro > div { min-height: 450px; padding: 2rem 1.5rem; }
+    .portrait-intro h1 { font-size: clamp(3.2rem, 14vw, 5rem); }
+    .portrait-intro figure, .portrait-intro img { height: auto; max-height: 480px; }
+    .work-feature { padding-top: 2rem; }
+    .summit-photo { gap: 1rem; }
+  }
+  @media (max-width: 380px) {
+    .portrait-intro > div { min-height: 420px; }
+  }
+</style>
+

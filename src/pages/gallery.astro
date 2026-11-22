@@ -1,0 +1,19 @@
+---
+export const prerender = false;
+import Layout from '../layouts/Layout.astro';
+import { getGalleryPhotos } from '../lib/site-content';
+const photos = await getGalleryPhotos();
+---
+<Layout title="Gallery" description="Photos from Samuel Khawsigan’s events and visits.">
+  <div class="page-head"><h1>Gallery</h1><a class="text-command" href="/events/">Events ↗</a></div>
+  {photos.length ? <div class="event-photo-grid">
+    {photos.map((photo) => (
+      <figure id={photo.slug}>
+        <a href={photo.src} aria-label={`Open full photo: ${photo.title}`}>
+          <img src={photo.src} alt={photo.alt} width={photo.width ?? undefined} height={photo.height ?? undefined} loading="lazy" decoding="async" />
+        </a>
+        <figcaption>{photo.title}</figcaption>
+      </figure>
+    ))}
+  </div> : <p>No gallery photos published yet.</p>}
+</Layout>
