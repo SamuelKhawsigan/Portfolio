@@ -65,13 +65,13 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
 }
 ---
 <AdminLayout title={isNew ? 'Add photo' : 'Edit photo'}>
-  <p><a href="/admin/gallery/">← All photos</a></p>
+  <div class="editor-page editor-page--form"><a class="back-action" href="/admin/gallery/">← All photos</a>
   {isNew || existing ? <>
-    <h1>{isNew ? 'Add photo' : 'Edit photo'}</h1>
+    <header class="admin-page-header"><div><p class="admin-page-eyebrow">Content / Gallery</p><h1>{isNew ? 'Add photo' : 'Edit photo'}</h1><p class="admin-page-subtitle">Photos appear on the Gallery and Events pages when published.</p></div></header>
     {error ? <p class="msg msg-err" role="alert">{error}</p> : Astro.url.searchParams.has('saved') && <p class="msg msg-ok" role="status">Photo saved.</p>}
     {values.image_path && <img class="photo-preview" src={imageUrl(values.image_path)} alt={values.alt || 'Current gallery photo'} />}
-    <form method="POST" enctype="multipart/form-data">
-      <div class="field"><label for="photo">{isNew ? 'Photo' : 'Replace photo (optional)'}</label><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required={isNew}/><small>JPEG, PNG or WebP, maximum 8 MB. Remove private details before uploading.</small></div>
+    <form class="editor-form" method="POST" enctype="multipart/form-data">
+      <div class="field upload-box"><label for="photo">{isNew ? 'Photo' : 'Replace photo (optional)'}</label><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required={isNew} aria-describedby="photo-help"/><small id="photo-help">JPEG, PNG or WebP, maximum 8 MB. Remove private details before uploading.</small></div>
       <div class="field-row"><div class="field"><label for="title">Title</label><input id="title" name="title" value={values.title} maxlength="160" required/></div><div class="field"><label for="slug">URL anchor</label><input id="slug" name="slug" value={values.slug} maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" readonly={existing?.status === 'published'} required/></div></div>
       <div class="field"><label for="summary">Event summary</label><textarea id="summary" name="summary" rows="3" maxlength="500">{values.summary}</textarea></div>
       <div class="field"><label for="alt">Image description for screen readers</label><input id="alt" name="alt" value={values.alt} maxlength="300" required/></div>
@@ -79,7 +79,7 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
       <details><summary>Image dimensions (optional)</summary><div class="field-row"><div class="field"><label for="width">Width in pixels</label><input id="width" name="width" type="number" value={values.width ?? ''} min="1" max="20000"/></div><div class="field"><label for="height">Height in pixels</label><input id="height" name="height" type="number" value={values.height ?? ''} min="1" max="20000"/></div></div></details>
       <div class="form-actions"><button class="btn btn-primary" type="submit">Save photo</button>{!isNew && values.status === 'published' && <a class="btn" href={`/gallery/#${values.slug}`}>View in gallery ↗</a>}</div>
     </form>
-  </> : <h1>{loaded?.error ? 'Couldn’t load photo' : 'Photo not found'}</h1>}
+  </> : <h1>{loaded?.error ? 'Couldn’t load photo' : 'Photo not found'}</h1>}</div>
 </AdminLayout>
 <style>
   .photo-preview{display:block;max-width:100%;max-height:320px;object-fit:contain;margin:0 0 1.5rem;border:1px solid var(--line)}

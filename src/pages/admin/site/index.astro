@@ -84,18 +84,18 @@ if (Astro.request.method === 'POST' && !loaded.error) {
 }
 ---
 <AdminLayout title="Site text">
-  <div class="page-actions"><h1>Site text</h1><a class="btn" href="/">View site ↗</a></div>
-  <p class="help">Edit the words and contact links used across the public pages. Save once at the bottom. Layout and colors stay in the site code.</p>
+  <div class="editor-page"><header class="admin-page-header"><div><p class="admin-page-eyebrow">Content / Site text</p><h1>Site text</h1><p class="admin-page-subtitle">Edit words, social links, profile details, and your portrait. Layout and colour choices stay in the site code.</p></div><a class="secondary-button" href="/">View site <span aria-hidden="true">↗</span></a></header>
   {error ? <p class="msg msg-err" role="alert">{error}</p> : Astro.url.searchParams.has('saved') && <p class="msg msg-ok" role="status">Site text saved.</p>}
-  <form method="POST" enctype="multipart/form-data">
-    <div class="form-section"><h2>Portrait</h2><p class="help">Used on Home and Profile. Use a photo of yourself and remove sensitive metadata before uploading.</p><div class="field"><label for="portrait">Replace portrait (optional)</label><input id="portrait" name="portrait" type="file" accept="image/jpeg,image/png,image/webp"/></div></div>
-    {sections.map(section => <section class="form-section"><h2>{section.title}</h2><div class="site-fields">{section.fields.map(({key,label}) => <div class="field"><label for={key}>{label}</label>{key === 'contact_email' || key === 'contact_github' || key === 'contact_linkedin' ? <input id={key} name={key} value={values[key]} type={key === 'contact_email' ? 'email' : 'url'} maxlength="1200" required /> : <textarea id={key} name={key} rows="2" maxlength="1200">{values[key]}</textarea>}</div>)}</div></section>)}
-    <div class="form-actions"><button class="btn btn-primary" type="submit" disabled={!!loaded.error}>Save site text</button></div>
-  </form>
+  <form class="editor-form site-editor-form" method="POST" enctype="multipart/form-data">
+    <section class="editor-section"><h2>Portrait</h2><p class="help">Used on Home and Profile. Use a photo of yourself and remove sensitive metadata before uploading.</p><div class="field upload-box"><label for="portrait">Replace portrait (optional)</label><input id="portrait" name="portrait" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="portrait-help"/><small id="portrait-help">JPEG, PNG or WebP up to 8 MB. Uploads are converted to WebP and stripped of metadata.</small></div></section>
+    {sections.map(section => <section class="editor-section"><h2>{section.title}</h2><div class="site-fields">{section.fields.map(({key,label}) => <div class="field"><label for={key}>{label}</label>{key === 'contact_email' || key === 'contact_github' || key === 'contact_linkedin' ? <input id={key} name={key} value={values[key]} type={key === 'contact_email' ? 'email' : 'url'} maxlength="1200" required /> : <textarea id={key} name={key} rows="2" maxlength="1200">{values[key]}</textarea>}</div>)}</div></section>)}
+    <div class="form-actions"><span class="save-hint">Changes appear on the site without a rebuild.</span><button class="btn btn-primary" type="submit" disabled={!!loaded.error}>Save changes</button></div>
+  </form></div>
 </AdminLayout>
 <style>
-  .site-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 1.2rem}
+  .site-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem}
   .site-fields .field{min-width:0}
   .site-fields textarea{min-height:76px}
+  .save-hint{color:var(--muted);font-size:.8rem}
   @media(max-width:720px){.site-fields{grid-template-columns:1fr}}
 </style>

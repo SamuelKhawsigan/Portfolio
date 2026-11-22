@@ -61,12 +61,12 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
 }
 ---
 <AdminLayout title={isNew ? 'Add achievement' : 'Edit achievement'}>
-  <p><a href="/admin/achievements/">← All achievements</a></p>
-  {isNew || existing ? <><h1>{isNew ? 'Add achievement' : 'Edit achievement'}</h1>
+  <div class="editor-page editor-page--form"><a class="back-action" href="/admin/achievements/">← All achievements</a>
+  {isNew || existing ? <><header class="admin-page-header"><div><p class="admin-page-eyebrow">Content / Achievements</p><h1>{isNew ? 'Add achievement' : 'Edit achievement'}</h1><p class="admin-page-subtitle">Record completion, participation, and team CTF results with an accurate source image.</p></div></header>
     {error ? <p class="msg msg-err" role="alert">{error}</p> : Astro.url.searchParams.has('saved') && <p class="msg msg-ok" role="status">Record saved.</p>}
     {values.image_path && <img class="record-preview" src={imageUrl(values.image_path)} alt={values.alt || 'Current record image'}/>}
-    <form method="POST" enctype="multipart/form-data">
-      <div class="field"><label for="photo">{isNew ? 'Record image' : 'Replace image (optional)'}</label><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required={isNew}/><small>Sanitize certificates and screenshots before uploading. JPEG, PNG or WebP, maximum 8 MB.</small></div>
+    <form class="editor-form" method="POST" enctype="multipart/form-data">
+      <div class="field upload-box"><label for="photo">{isNew ? 'Record image' : 'Replace image (optional)'}</label><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required={isNew} aria-describedby="photo-help"/><small id="photo-help">Sanitize certificates and screenshots before uploading. JPEG, PNG or WebP, maximum 8 MB.</small></div>
       <div class="field-row"><div class="field"><label for="title">Title</label><input id="title" name="title" value={values.title} maxlength="180" required/></div><div class="field"><label for="slug">URL anchor</label><input id="slug" name="slug" value={values.slug} maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" readonly={existing?.status === 'published'} required/></div></div>
       <div class="field-row"><div class="field"><label for="category">Group</label><select id="category" name="category"><option value="completion" selected={values.category === 'completion'}>Course completion</option><option value="participation" selected={values.category === 'participation'}>Workshop participation</option><option value="ctf" selected={values.category === 'ctf'}>CTF team result</option></select></div><div class="field"><label for="date_label">Date as displayed</label><input id="date_label" name="date_label" value={values.date_label} maxlength="100"/></div></div>
       <div class="field-row"><div class="field"><label for="issuer">Issuer / organiser</label><input id="issuer" name="issuer" value={values.issuer} maxlength="120"/></div><div class="field"><label for="type">Type or team result</label><input id="type" name="type" value={values.type} maxlength="160"/></div></div>
@@ -76,6 +76,6 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
       <details><summary>Image dimensions (optional)</summary><div class="field-row"><div class="field"><label for="width">Width</label><input id="width" name="width" type="number" value={values.width ?? ''} min="1" max="20000"/></div><div class="field"><label for="height">Height</label><input id="height" name="height" type="number" value={values.height ?? ''} min="1" max="20000"/></div></div></details>
       <div class="form-actions"><button class="btn btn-primary" type="submit">Save record</button>{!isNew && values.status === 'published' && <a class="btn" href={`/projects/#${values.slug}`}>View on site ↗</a>}</div>
     </form>
-  </> : <h1>{loaded?.error ? 'Couldn’t load record' : 'Record not found'}</h1>}
+  </> : <h1>{loaded?.error ? 'Couldn’t load record' : 'Record not found'}</h1>}</div>
 </AdminLayout>
 <style>.record-preview{display:block;max-width:100%;max-height:320px;object-fit:contain;margin:0 0 1.5rem;border:1px solid var(--line)}.field small{display:block;color:var(--muted);margin-top:.35rem}details{margin:1.2rem 0;border-top:1px solid var(--line);padding-top:.8rem}summary{cursor:pointer;color:var(--accent)}details .field-row{margin-top:1rem}</style>

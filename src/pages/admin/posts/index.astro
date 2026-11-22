@@ -12,33 +12,8 @@ const { data: posts, error } = await supabase
   .order('updated_at', { ascending: false });
 ---
 <AdminLayout title="Posts">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
-    <h1 style="margin:0">Blog posts</h1>
-    <a href="/admin/posts/new" class="btn btn-primary">New post</a>
-  </div>
-
+  <div class="editor-page"><header class="admin-page-header"><div><p class="admin-page-eyebrow">Content / Blog</p><h1>Blog posts</h1><p class="admin-page-subtitle">Write in Markdown, save drafts, and publish when the post is ready for visitors.</p></div><a href="/admin/posts/new" class="action-button">+ New blog post</a></header>
   {error && <p class="msg msg-err" role="alert">Couldn’t load posts. Check the blog database and try again.</p>}
-
-  {posts && posts.length > 0 ? (
-    <div class="item-list">
-      {posts.map(post => (
-        <div class="item-row">
-          <div>
-            <div class="item-title">{post.title}</div>
-            <div class="item-meta">
-              /{post.slug} &nbsp;·&nbsp; {post.category}
-              {post.published_at && <> &nbsp;·&nbsp; {new Date(post.published_at).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}</>}
-            </div>
-          </div>
-          <span class={`badge badge-${post.status}`}>{post.status}</span>
-          <div style="display:flex;gap:.5rem">
-            {post.status === 'published' && <a href={`/blog/${encodeURIComponent(post.slug)}/`} class="btn btn-sm">View</a>}
-            <a href={`/admin/posts/${post.id}`} class="btn btn-sm">Edit</a>
-          </div>
-        </div>
-      ))}
-    </div>
-  ) : !error && (
-    <p style="color:var(--muted);font-size:.88rem">No posts yet.</p>
-  )}
+  {posts && posts.length > 0 ? <div class="content-list">{posts.map(post => <article class="content-card"><div><h2 class="content-card-title">{post.title}</h2><div class="content-card-meta"><span class="meta-pill">/{post.slug}</span><span class="meta-pill">{post.category}</span>{post.published_at && <span class="meta-pill">{new Date(post.published_at).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}</span>}<span class={`status-pill status-pill--${post.status}`}>{post.status}</span></div></div><div class="card-actions">{post.status === 'published' && <a href={`/blog/${encodeURIComponent(post.slug)}/`} class="secondary-button">View</a>}<a href={`/admin/posts/${post.id}`} class="secondary-button">Edit <span aria-hidden="true">→</span></a></div></article>)}</div> : !error && <p class="help">No posts yet.</p>}</div>
 </AdminLayout>
+<style>.card-actions{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end}@media(max-width:620px){.content-card{grid-template-columns:1fr}.card-actions{justify-content:flex-start}}</style>

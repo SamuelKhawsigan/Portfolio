@@ -69,22 +69,22 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
 }
 ---
 <AdminLayout title={isNew ? 'Add project' : 'Edit project'}>
-  <p><a href="/admin/projects/">← All projects</a></p>
-  {isNew || existing ? <><h1>{isNew ? 'Add project' : 'Edit project'}</h1>
+  <div class="editor-page editor-page--form"><a class="back-action" href="/admin/projects/">← All projects</a>
+  {isNew || existing ? <><header class="admin-page-header"><div><p class="admin-page-eyebrow">Content / Projects</p><h1>{isNew ? 'Add project' : 'Edit project'}</h1><p class="admin-page-subtitle">Record the problem, approach, tools, and result. Keep screenshots sanitized and claims specific.</p></div></header>
     {error ? <p class="msg msg-err" role="alert">{error}</p> : Astro.url.searchParams.has('saved') && <p class="msg msg-ok" role="status">Project saved.</p>}
     {values.cover_image && <img class="project-preview" src={imageUrl(values.cover_image)} alt={values.cover_alt || 'Current project image'}/>}
-    <form method="POST" enctype="multipart/form-data">
+    <form class="editor-form" method="POST" enctype="multipart/form-data">
       <div class="field-row"><div class="field"><label for="title">Title</label><input id="title" name="title" value={values.title} maxlength="180" required/></div><div class="field"><label for="slug">URL slug</label><input id="slug" name="slug" value={values.slug} maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" readonly={existing?.status === 'published'} required/></div></div>
       <div class="field"><label for="description">Short summary</label><textarea id="description" name="description" rows="2" maxlength="500">{values.description}</textarea></div>
       <p class="help">The sections below accept Markdown. Keep screenshots sanitized and claims specific.</p>
       {([['problem','Problem'],['approach','Approach'],['tools','Tools'],['result','Result'],['learned','What I learned']] as const).map(([key,label]) => <div class="field"><label for={key}>{label}</label><textarea id={key} name={key} rows="5" maxlength="10000">{values[key]}</textarea></div>)}
-      <div class="field"><label for="photo">Project image (optional)</label><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp"/><small>JPEG, PNG or WebP, maximum 8 MB.</small></div>
+      <div class="field upload-box"><label for="photo">Project image (optional)</label><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="photo-help"/><small id="photo-help">JPEG, PNG or WebP, maximum 8 MB.</small></div>
       <div class="field"><label for="cover_alt">Image description</label><input id="cover_alt" name="cover_alt" value={values.cover_alt ?? ''} maxlength="300"/></div>
       <div class="field-row"><div class="field"><label for="repo_url">Source URL (optional)</label><input id="repo_url" name="repo_url" type="url" value={values.repo_url ?? ''} maxlength="2000"/></div><div class="field"><label for="live_url">Live URL (optional)</label><input id="live_url" name="live_url" type="url" value={values.live_url ?? ''} maxlength="2000"/></div></div>
       <div class="field-row"><div class="field"><label for="display_order">Order (smallest first)</label><input id="display_order" name="display_order" type="number" value={values.display_order} min="-100000" max="100000" required/></div><div class="field"><label for="status">Visibility</label><select id="status" name="status"><option value="draft" selected={values.status === 'draft'}>Draft</option><option value="published" selected={values.status === 'published'}>Published</option></select></div></div>
       <div class="field"><label class="checkbox-label"><input type="checkbox" name="featured" checked={values.featured}/> Feature on Home</label></div>
       <div class="form-actions"><button class="btn btn-primary" type="submit">Save project</button>{!isNew && values.status === 'published' && <a class="btn" href={`/projects/${values.slug}/`}>View project ↗</a>}</div>
     </form>
-  </> : <h1>{loaded?.error ? 'Couldn’t load project' : 'Project not found'}</h1>}
+  </> : <h1>{loaded?.error ? 'Couldn’t load project' : 'Project not found'}</h1>}</div>
 </AdminLayout>
 <style>.project-preview{display:block;max-width:100%;max-height:320px;object-fit:contain;margin:0 0 1.5rem;border:1px solid var(--line)}.field small{display:block;color:var(--muted);margin-top:.35rem}.checkbox-label{display:flex!important;align-items:center;gap:.6rem;text-transform:none!important;font:1rem var(--sans)!important}.checkbox-label input{width:auto}</style>
