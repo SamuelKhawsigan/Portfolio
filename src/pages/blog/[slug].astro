@@ -5,26 +5,28 @@ import { createPublicBlogClient } from '../../lib/supabase';
 import { renderMarkdown } from '../../lib/markdown';
 
 const client = createPublicBlogClient();
-const result = client && await client.from('posts')
-  .select('title,excerpt,content_md,published_at')
-  .eq('status', 'published')
-  .eq('slug', Astro.params.slug)
-  .maybeSingle();
+const result = client && await client.from('posts').select('title,slug,excerpt,category,content_md,published_at').eq('status', 'published').eq('slug', Astro.params.slug).maybeSingle();
 const post = result?.data;
 if (!post) Astro.response.status = result?.error ? 503 : 404;
-const html = post && await renderMarkdown(post.content_md);
+const coverMatch = post?.content_md.match(/!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)/);
+const cover = coverMatch ? { alt: coverMatch[1], src: coverMatch[2] } : null;
+const bodyMarkdown = post?.content_md.replace(/!\[[^\]]*\]\([^\s)]+(?:\s+"[^"]*")?\)\s*/, '') ?? '';
+const headings = [...bodyMarkdown.matchAll(/^#{2,3}\s+(.+)$/gm)].map(match => ({ label: match[1].replace(/[*_`]/g, ''), id: match[1].toLowerCase().replace(/[*_`]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') }));
+let headingIndex = 0;
+const rendered = post && await renderMarkdown(bodyMarkdown);
+const html = rendered?.replace(/<h([23])>(.*?)<\/h\1>/g, (match, level) => {
+  const heading = headings[headingIndex++];
+  return heading ? `<h${level} id="${heading.id}">${match.slice(match.indexOf('>') + 1, match.lastIndexOf('</h'))}</h${level}>` : match;
+});
+const wordCount = bodyMarkdown.replace(/```[\s\S]*?```/g, '').trim().split(/\s+/).filter(Boolean).length;
+const minutes = Math.max(1, Math.ceil(wordCount / 220));
+const relatedResult = post && client && await client.from('posts').select('title,slug,excerpt,content_md,published_at').eq('status', 'published').neq('slug', post.slug).order('published_at', { ascending: false }).limit(3);
+const related = relatedResult?.data ?? [];
 ---
 <Layout title={post?.title ?? (result?.error ? 'Blog unavailable' : '404')} description={post?.excerpt || undefined}>
-  <p><a class="text-command" href="/blog/">← Blog</a></p>
-  {post ? (
-    <article class="prose blog-post">
-      <h1>{post.title}</h1>
-      {post.published_at && <time class="eyebrow" datetime={post.published_at}>{new Date(post.published_at).toLocaleDateString('en-GB', { dateStyle: 'long', timeZone: 'Asia/Kuala_Lumpur' })}</time>}
-      <div set:html={html} />
-    </article>
-  ) : <h1>{result?.error ? 'Blog unavailable' : 'Post not found'}</h1>}
+  <p class="blog-back"><a class="text-command" href="/blog/">← All posts</a></p>
+  {post ? <article class="article-shell"><header class="article-header"><div><p class="post-topic">{post.category?.trim() || 'Notes'}</p><h1>{post.title}</h1>{post.excerpt && <p class="article-dek">{post.excerpt}</p>}<div class="article-meta">{post.published_at && <time datetime={post.published_at}>{new Date(post.published_at).toLocaleDateString('en-GB', { dateStyle: 'long', timeZone: 'Asia/Kuala_Lumpur' })}</time>}<span>{minutes} min read</span></div></div></header>{cover && <figure class="article-cover"><img src={cover.src} alt={cover.alt} loading="eager" decoding="async"/></figure>}<div class="article-layout"><div class="prose blog-post" set:html={html}/><aside class="article-aside">{headings.length > 0 && <nav class="article-toc" aria-label="Table of contents"><h2>On this page</h2><ol>{headings.map(item => <li><a href={`#${item.id}`}>{item.label}</a></li>)}</ol></nav>}{related.length > 0 && <section class="related-posts"><h2>Related posts</h2>{related.map(item => <a href={`/blog/${encodeURIComponent(item.slug)}/`}><strong>{item.title}</strong>{item.published_at && <small>{new Date(item.published_at).toLocaleDateString('en-GB', {day:'numeric',month:'short',timeZone:'Asia/Kuala_Lumpur'})}</small>}</a>)}</section>}</aside></div></article> : <h1>{result?.error ? 'Blog unavailable' : 'Post not found'}</h1>}
 </Layout>
 <style>
-  .blog-post { overflow-wrap: anywhere; }
-  .blog-post :global(table) { display: block; overflow-x: auto; max-width: 100%; }
+  .blog-back{margin:2rem 0 1.5rem}.article-shell{max-width:1280px}.article-header{max-width:920px;padding:1rem 0 2.5rem}.post-topic{margin:0;color:var(--accent);font:.72rem var(--mono);letter-spacing:.1em;text-transform:uppercase}.article-header h1{max-width:1000px;margin:.75rem 0;font-size:clamp(2.6rem,6vw,5.4rem);line-height:.98;letter-spacing:-.065em}.article-dek{max-width:780px;margin:0;color:var(--muted);font-size:clamp(1.05rem,2vw,1.35rem);line-height:1.5}.article-meta{display:flex;gap:.85rem;flex-wrap:wrap;margin-top:1.25rem;color:var(--muted);font:.78rem var(--mono)}.article-cover{margin:0 0 2rem;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:#0c1822;aspect-ratio:16/8}.article-cover img{width:100%;height:100%;object-fit:cover;display:block}.article-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(230px,.32fr);gap:clamp(2rem,6vw,6rem);align-items:start}.blog-post{max-width:760px;overflow-wrap:anywhere}.blog-post :global(table){display:block;overflow-x:auto;max-width:100%}.blog-post :global(h2),.blog-post :global(h3){scroll-margin-top:6rem}.article-aside{position:sticky;top:1.25rem;display:grid;gap:1rem}.article-toc,.related-posts{padding:1.1rem;border:1px solid var(--line);border-radius:12px;background:var(--pane)}.article-toc h2,.related-posts h2{margin:0 0 .8rem;color:var(--accent);font:.72rem var(--mono);letter-spacing:.08em;text-transform:uppercase}.article-toc ol{display:grid;gap:.55rem;margin:0;padding-left:1rem}.article-toc a{color:var(--muted);font-size:.88rem;text-decoration:none}.article-toc a:hover{color:var(--accent)}.related-posts{display:grid;gap:.7rem}.related-posts a{display:grid;gap:.2rem;padding-bottom:.7rem;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none;font-size:.86rem}.related-posts a:last-child{padding:0;border:0}.related-posts a:hover strong{color:var(--accent)}.related-posts small{color:var(--muted);font:.72rem var(--mono)}@media(max-width:900px){.article-layout{grid-template-columns:1fr}.article-aside{position:static;grid-template-columns:repeat(2,minmax(0,1fr))}.blog-post{max-width:none}}@media(max-width:620px){.article-header{padding-bottom:1.5rem}.article-aside{grid-template-columns:1fr}.article-cover{border-radius:7px;aspect-ratio:4/3}}
 </style>

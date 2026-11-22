@@ -2,31 +2,28 @@
 export const prerender = false;
 import Layout from '../../layouts/Layout.astro';
 import { createPublicBlogClient } from '../../lib/supabase';
-
 const client = createPublicBlogClient();
-const result = client && await client.from('posts')
-  .select('slug,title,excerpt,published_at')
-  .eq('status', 'published')
-  .order('published_at', { ascending: false, nullsFirst: false });
-const posts = result?.data ?? [];
+const result = client && await client.from('posts').select('slug,title,excerpt,category,content_md,published_at').eq('status', 'published').order('published_at', { ascending: false, nullsFirst: false });
+const query = Astro.url.searchParams.get('q')?.trim() ?? '';
+const searchablePosts = (result?.data ?? []).map((post) => { const image = post.content_md?.match(/!\[[^\]]*\]\(([^\s)]+)/)?.[1] ?? null; const words = (post.content_md ?? '').replace(/```[\s\S]*?```/g, '').trim().split(/\s+/).filter(Boolean).length; return { ...post, image, topic: post.category?.trim() || 'Notes', minutes: Math.max(1, Math.ceil(words / 220)) }; });
+const queryNeedle = query.toLocaleLowerCase();
+const posts = queryNeedle ? searchablePosts.filter((post) => `${post.title} ${post.excerpt ?? ''} ${post.category ?? ''} ${post.content_md ?? ''}`.toLocaleLowerCase().includes(queryNeedle)) : searchablePosts;
+const topics = [...new Set(posts.map(post => post.topic))];
+const latest = posts[0]; const rest = posts.slice(1);
 if (result?.error) Astro.response.status = 503;
 ---
-<Layout title="Blog" description="Samuel Khawsigan’s cybersecurity blog and learning notes.">
-  <div class="page-head"><h1>Blog</h1><a class="text-command" href="/write-ups/">Write-up archive ↗</a></div>
-  {result?.error ? <p>Couldn’t load posts. Please try again later.</p> : posts.length === 0 ? <p>No blog posts yet.</p> : (
-    <div class="project-rows">
-      {posts.map((post) => (
-        <article class="blog-entry">
-          {post.published_at && <time class="eyebrow" datetime={post.published_at}>{new Date(post.published_at).toLocaleDateString('en-GB', { dateStyle: 'long', timeZone: 'Asia/Kuala_Lumpur' })}</time>}
-          <h2><a href={`/blog/${encodeURIComponent(post.slug)}/`}>{post.title}</a></h2>
-          {post.excerpt && <p>{post.excerpt}</p>}
-        </article>
-      ))}
-    </div>
-  )}
+<Layout title="Blog" description="Samuel Khawsigan’s cybersecurity field notes, security labs, and learning write-ups.">
+  <section class="blog-intro" aria-labelledby="blog-title"><div><p class="eyebrow">Field notes / public learning log</p><h1 id="blog-title">Blog</h1><p>Notes from security labs, events, and the parts of a problem that only make sense after the second try.</p></div><a class="text-command" href="/write-ups/">Write-up archive <span aria-hidden="true">↗</span></a></section>
+  {result?.error ? <p>Couldn’t load posts. Please try again later.</p> : posts.length === 0 ? <div class="blog-empty"><strong>No posts published yet.</strong><p>The editor is ready. The notes need writing.</p></div> : <>
+    <form class="blog-search" action="/blog/" method="get" role="search"><label for="post-search">Search posts</label><div><input id="post-search" name="q" type="search" value={query} placeholder="Search posts"/><button type="submit">Search <span aria-hidden="true">→</span></button></div></form><div class="blog-filters" aria-label="Filter posts"><button class="blog-filter is-active" type="button" data-topic="all">All posts</button>{topics.map(topic => <button class="blog-filter" type="button" data-topic={topic}>{topic}</button>)}</div>
+    {latest && <article class="latest-post" data-post data-topic={latest.topic}><a class="latest-media" href={`/blog/${encodeURIComponent(latest.slug)}/`} aria-label={`Read ${latest.title}`}>{latest.image ? <img src={latest.image} alt="" loading="eager" decoding="async"/> : <span>NO COVER IMAGE</span>}</a><div class="latest-copy"><p class="post-topic">Latest / {latest.topic}</p><h2>{latest.title}</h2>{latest.excerpt && <p>{latest.excerpt}</p>}<div class="post-meta">{latest.published_at && <time datetime={latest.published_at}>{new Date(latest.published_at).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kuala_Lumpur'})}</time>}<span>{latest.minutes} min read</span></div><a class="editorial-link" href={`/blog/${encodeURIComponent(latest.slug)}/`}>Read post <span aria-hidden="true">→</span></a></div></article>}
+    {rest.length > 0 && <div class="blog-tile-grid">{rest.map(post => <article class="blog-tile" data-post data-topic={post.topic}><a class="blog-tile-media" href={`/blog/${encodeURIComponent(post.slug)}/`} aria-label={`Read ${post.title}`}>{post.image ? <img src={post.image} alt="" loading="lazy" decoding="async"/> : <span>NO COVER IMAGE</span>}</a><div class="blog-tile-copy"><p class="post-topic">{post.topic}</p><h2>{post.title}</h2>{post.excerpt && <p>{post.excerpt}</p>}<div class="post-meta">{post.published_at && <time datetime={post.published_at}>{new Date(post.published_at).toLocaleDateString('en-GB', {day:'numeric',month:'short',timeZone:'Asia/Kuala_Lumpur'})}</time>}<span>{post.minutes} min read</span></div><a class="text-command" href={`/blog/${encodeURIComponent(post.slug)}/`}>Read post <span aria-hidden="true">→</span></a></div></article>)}</div>}
+  </>}{query && posts.length === 0 && <p class="blog-empty"><strong>No posts found for “{query}”.</strong><a href="/blog/">Clear search</a></p>}
 </Layout>
 <style>
-  .blog-entry { padding: 1.5rem 0; border-bottom: 1px solid var(--line); }
-  .blog-entry h2 { margin: .5rem 0; }
-  .blog-entry p { color: var(--muted); margin: 0; }
+  .blog-intro{display:flex;align-items:end;justify-content:space-between;gap:2rem;margin:3rem 0 1.8rem}.blog-intro h1{margin:.3rem 0;font-size:clamp(3rem,7vw,6rem);letter-spacing:-.06em}.blog-intro p:not(.eyebrow){max-width:44rem;margin:0;color:var(--muted);font-size:1.1rem}.blog-search{max-width:38rem;margin:0 0 1rem}.blog-search label{display:block;margin-bottom:.45rem;color:var(--muted);font:.72rem var(--mono);letter-spacing:.06em;text-transform:uppercase}.blog-search div{display:flex;gap:.55rem}.blog-search input{min-width:0;flex:1;min-height:42px;padding:.55rem .8rem;border:1px solid var(--line);border-radius:7px;background:var(--pane);color:var(--ink);font:inherit}.blog-search button{min-height:42px;padding:.55rem .9rem;border:1px solid var(--accent);border-radius:7px;background:var(--accent);color:var(--paper-ink);font-weight:600;cursor:pointer}.blog-filters{display:flex;gap:.55rem;flex-wrap:wrap;margin:0 0 1.8rem}.blog-filter{min-height:38px;padding:.35rem .85rem;border:1px solid var(--line);border-radius:999px;background:var(--pane);color:var(--muted);font:600 .85rem var(--sans);cursor:pointer;transition:background-color 160ms ease,border-color 160ms ease,color 160ms ease}.blog-filter:hover,.blog-filter.is-active{background:var(--accent);border-color:var(--accent);color:var(--paper-ink)}.latest-post{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.9fr);overflow:hidden;border:1px solid var(--line);border-radius:12px;background:var(--pane)}.latest-media{display:block;min-height:360px;background:#0c1822}.latest-media img,.blog-tile-media img{width:100%;height:100%;object-fit:cover;display:block}.latest-media span,.blog-tile-media span{display:grid;place-items:center;width:100%;height:100%;color:var(--accent);font:.75rem var(--mono);letter-spacing:.1em}.latest-copy{display:flex;flex-direction:column;align-items:flex-start;padding:clamp(1.5rem,4vw,3rem)}.post-topic{margin:0;color:var(--accent);font:.72rem var(--mono);letter-spacing:.09em;text-transform:uppercase}.latest-copy h2{margin:.75rem 0;font-size:clamp(1.8rem,4vw,3.25rem);line-height:1.04;letter-spacing:-.045em}.latest-copy>p:not(.post-topic){margin:0;color:var(--muted);font-size:1.05rem}.post-meta{display:flex;flex-wrap:wrap;gap:.7rem;margin:1.25rem 0;color:var(--muted);font:.78rem var(--mono)}.latest-copy .editorial-link{margin-top:auto}.blog-tile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.25rem;margin-top:1.5rem}.blog-tile{display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:var(--pane)}.blog-tile-media{display:block;aspect-ratio:16/9;background:#0c1822}.blog-tile-copy{display:flex;flex:1;flex-direction:column;align-items:flex-start;padding:1.1rem}.blog-tile h2{margin:.55rem 0;font-size:1.25rem;line-height:1.15}.blog-tile-copy>p:not(.post-topic){margin:0;color:var(--muted)}.blog-tile-copy .text-command{margin-top:auto}.blog-empty{padding:2rem;border:1px dashed var(--line);background:var(--pane)}@media(max-width:720px){.blog-intro{align-items:flex-start;flex-direction:column;margin-top:2rem}.latest-post{grid-template-columns:1fr}.latest-media{min-height:230px}.blog-search{width:100%}.blog-search div{flex-direction:column}.blog-search button{width:100%}}
 </style>
+<script>
+  const filters = document.querySelectorAll<HTMLButtonElement>('[data-topic]'); const cards = document.querySelectorAll<HTMLElement>('[data-post]');
+  filters.forEach((filter) => filter.addEventListener('click', () => { const topic = filter.dataset.topic; filters.forEach(button => button.classList.toggle('is-active', button === filter)); cards.forEach(card => { card.hidden = topic !== 'all' && card.dataset.topic !== topic; }); }));
+</script>

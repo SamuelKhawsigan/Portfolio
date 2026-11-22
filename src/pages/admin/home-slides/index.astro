@@ -1,0 +1,13 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getAdminClient } from '../../../lib/auth';
+const supabase = await getAdminClient(Astro);
+if (!supabase) return Astro.redirect('/admin/login/');
+const { data: slides, error } = await supabase.from('home_portrait_slides').select('*').order('display_order', { ascending: true });
+const imageUrl = (path: string) => path.startsWith('/') ? path : supabase.storage.from('portfolio-gallery').getPublicUrl(path).data.publicUrl;
+---
+<AdminLayout title="Home carousel">
+  <div class="editor-page"><header class="admin-page-header"><div><p class="admin-page-eyebrow">Content / Home carousel</p><h1>Portrait carousel</h1><p class="admin-page-subtitle">These photos rotate in the Home hero. Publish only the photos you want visitors to see.</p></div><a href="/admin/home-slides/new/" class="action-button">+ Add photo</a></header>
+  {error ? <p class="msg msg-err" role="alert">Couldn’t load carousel photos. Apply migration 008 and check permissions.</p> : slides?.length ? <div class="media-grid">{slides.map((slide) => <article class="media-card"><figure class="media-card-figure"><img src={imageUrl(slide.image_path)} alt="" loading="lazy"/></figure><div class="media-card-body"><h2>{slide.caption || 'Untitled portrait'}</h2><div class="media-card-meta"><span class="meta-pill">Order {slide.display_order}</span><span class={`status-pill status-pill--${slide.status}`}>{slide.status}</span></div><div class="media-card-footer"><span class="content-card-meta">Home hero</span><a class="secondary-button" href={`/admin/home-slides/${slide.id}/`}>Edit <span aria-hidden="true">→</span></a></div></div></article>)}</div> : <p class="help">No carousel photos yet. Add one to begin.</p>}</div>
+</AdminLayout>

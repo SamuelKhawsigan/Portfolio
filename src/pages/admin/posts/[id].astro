@@ -12,15 +12,21 @@ if (Astro.request.method === 'POST' && Astro.request.headers.get('origin') && As
 const id = Astro.params.id ?? '';
 const isNew = id === 'new';
 const validId = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id);
-const blank = { title: '', slug: '', excerpt: '', content_md: '', status: 'draft', published_at: null, version: 0 };
+const blank = { title: '', slug: '', excerpt: '', content_md: '', category: '', status: 'draft', published_at: null, version: 0 };
 const result = !isNew && validId
-  ? await supabase.from('posts').select('title,slug,excerpt,content_md,status,published_at,version').eq('id', id).maybeSingle()
+  ? await supabase.from('posts').select('title,slug,excerpt,content_md,category,status,published_at,version').eq('id', id).maybeSingle()
   : null;
 const existing = result?.data;
 if (!isNew && !existing) Astro.response.status = result?.error ? 503 : 404;
-let values = existing ?? blank;
+let values = existing ? { ...existing, category: existing.category ?? '' } : blank;
 let error = '';
 let version = values.version;
+let imageAlt = '';
+const imagePattern = /!\[([^\]]*)\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g;
+const getStoragePath = (url: string) => {
+  const prefix = supabase.storage.from('portfolio-gallery').getPublicUrl('').data.publicUrl;
+  return url.startsWith(prefix) ? decodeURIComponent(url.slice(prefix.length).split('?')[0]) : null;
+};
 
 if (Astro.request.method === 'POST' && (isNew || existing)) {
   const form = await Astro.request.formData();
@@ -28,7 +34,11 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
   const status = read('status');
   const image = form.get('image');
   const hasImage = image instanceof File && image.size > 0;
-  const imageAlt = read('image_alt');
+  const inlineImage = form.get('inline_image');
+  const hasInlineImage = inlineImage instanceof File && inlineImage.size > 0;
+  imageAlt = read('image_alt');
+  const inlineImageAlt = read('inline_image_alt');
+  const removeImages = form.getAll('remove_images').map(String).filter(url => url.length <= 4000);
   version = Number(read('version'));
   values = {
     ...values,
@@ -36,40 +46,55 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
     slug: existing?.status === 'published' ? existing.slug : read('slug').toLowerCase(),
     excerpt: read('excerpt'),
     content_md: read('content_md'),
+    category: read('category'),
     status,
   };
 
   if (!values.title || values.title.length > 160 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(values.slug) || values.slug.length > 100) {
     error = 'Enter a title and a URL slug using lowercase letters, numbers, and hyphens.';
-  } else if (!['draft', 'published'].includes(status) || (status === 'published' && !values.content_md) || (values.excerpt?.length ?? 0) > 320 || values.content_md.length > 100000) {
+  } else if (!['draft', 'published'].includes(status) || (status === 'published' && !values.content_md) || (values.excerpt?.length ?? 0) > 320 || values.content_md.length > 100000 || values.category.length > 48) {
     error = 'Check the post length and add body text before publishing.';
   } else if (hasImage && (!imageAlt || imageAlt.length > 300)) {
     error = 'Add a short image description before uploading.';
+  } else if (hasInlineImage && (!inlineImageAlt || inlineImageAlt.length > 300)) {
+    error = 'Add a description for the inline image before uploading.';
   } else if (existing && version !== existing.version) {
     Astro.response.status = 409;
     error = 'This post has changed since you opened it. Copy your edits before reopening the latest version.';
   } else {
-    let uploadedPath = '';
-    let content_md = values.content_md;
+    const uploadedPaths: string[] = [];
+    let content_md = values.content_md.replace(imagePattern, (match, _alt, url) => removeImages.includes(url) ? '' : match);
+    let replacedCoverUrl = '';
     if (hasImage) {
       const upload = await uploadPortfolioImage(supabase, image, 'blog');
       error = upload.error;
-      uploadedPath = upload.path;
-      if (uploadedPath) {
-        const imageUrl = supabase.storage.from('portfolio-gallery').getPublicUrl(uploadedPath).data.publicUrl;
-        content_md += `\n\n![${imageAlt.replace(/[\[\]]/g, '')}](${imageUrl})\n`;
+      if (upload.path) {
+        uploadedPaths.push(upload.path);
+        const imageUrl = supabase.storage.from('portfolio-gallery').getPublicUrl(upload.path).data.publicUrl;
+        let changed = false;
+        content_md = content_md.replace(imagePattern, (match, _alt, url) => { if (changed) return match; changed = true; replacedCoverUrl = url; return `![${imageAlt.replace(/[\[\]]/g, '')}](${imageUrl})`; });
+        if (!changed) content_md = `![${imageAlt.replace(/[\[\]]/g, '')}](${imageUrl})\n\n${content_md}`;
       }
     }
+    if (!error && hasInlineImage) {
+      const upload = await uploadPortfolioImage(supabase, inlineImage, 'blog');
+      error = upload.error;
+      if (upload.path) { uploadedPaths.push(upload.path); const imageUrl = supabase.storage.from('portfolio-gallery').getPublicUrl(upload.path).data.publicUrl; content_md += `\n\n![${inlineImageAlt.replace(/[\[\]]/g, '')}](${imageUrl})\n`; }
+    }
     if (!error && content_md.length > 100000) error = 'The post is too long after adding the image.';
-    if (error && uploadedPath) await supabase.storage.from('portfolio-gallery').remove([uploadedPath]);
+    if (error && uploadedPaths.length) await supabase.storage.from('portfolio-gallery').remove(uploadedPaths);
     if (!error) {
-      const { title, slug, excerpt } = values;
-      const post = { title, slug, excerpt, content_md, status, published_at: status === 'published' ? existing?.published_at ?? new Date().toISOString() : null };
+      const { title, slug, excerpt, category } = values;
+      const post = { title, slug, excerpt, category: category || null, content_md, status, published_at: status === 'published' ? existing?.published_at ?? new Date().toISOString() : null };
       const save = isNew
         ? await supabase.from('posts').insert(post).select('id').single()
         : await supabase.from('posts').update(post).eq('id', id).eq('version', version).select('id').maybeSingle();
-      if (save.data) return Astro.redirect(`/admin/posts/${save.data.id}/?saved=1`, 303);
-      if (uploadedPath) await supabase.storage.from('portfolio-gallery').remove([uploadedPath]);
+      if (save.data) {
+        const paths = [...removeImages, replacedCoverUrl].map(getStoragePath).filter((path): path is string => !!path);
+        if (paths.length) await supabase.storage.from('portfolio-gallery').remove(paths);
+        return Astro.redirect('/admin/posts/?saved=1', 303);
+      }
+      if (uploadedPaths.length) await supabase.storage.from('portfolio-gallery').remove(uploadedPaths);
       if (!save.error) {
         Astro.response.status = 409;
         error = 'This post changed while you were saving. Copy your edits before reopening it.';
@@ -83,27 +108,32 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
   }
   if (error && Astro.response.status === 200) Astro.response.status = 400;
 }
+const postImages = [...values.content_md.matchAll(imagePattern)].map(match => ({ alt: match[1], url: match[2] }));
 ---
 <AdminLayout title={isNew ? 'New blog post' : 'Edit blog post'}>
-  <div class="post-editor-shell">
+  <div class="post-editor-shell editor-page">
     <a class="back-action" href="/admin/posts/">← All posts</a>
     {existing || isNew ? (
       <>
         <header class="editor-heading"><p class="editor-kicker">Blog editor</p><h1>{isNew ? 'New blog post' : 'Edit blog post'}</h1></header>
-      {error ? <p class="msg msg-err" role="alert">{error}</p> : Astro.url.searchParams.has('saved') && <p class="msg msg-ok" role="status">Post saved.</p>}
+      {error && <p class="msg msg-err" role="alert">{error}</p>}
       <form class="post-form" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="version" value={version} />
-        <div class="field"><label for="title">Title</label><input id="title" name="title" value={values.title} maxlength="160" required /></div>
-        <div class="field"><label for="slug">URL slug</label><div class="slug-control"><span aria-hidden="true">/blog/</span><input id="slug" name="slug" value={values.slug} pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="100" readonly={existing?.status === 'published'} required /></div></div>
-        <div class="field"><label for="excerpt">Summary</label><input id="excerpt" name="excerpt" value={values.excerpt ?? ''} maxlength="320" /></div>
-        <div class="field markdown-field"><label for="content_md">Post body (Markdown)</label><textarea id="content_md" name="content_md" rows="16" maxlength="100000" placeholder="Write your post in Markdown…">{values.content_md}</textarea></div>
-        <section class="media-section" aria-labelledby="media-title"><div><h2 id="media-title">Media</h2><p>Add one optional image. It will be placed at the end of the post when saved.</p></div><div class="field"><label for="image">Add an image to the end of this post (optional)</label><input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="image-help"/><small id="image-help">JPEG, PNG or WebP up to 8 MB. The upload is converted to WebP and stripped of metadata. Remove sensitive details visible in the picture before uploading.</small></div><div class="field"><label for="image_alt">Image description</label><input id="image_alt" name="image_alt" value={Astro.request.method === 'POST' ? imageAlt : ''} maxlength="300" placeholder="What the image shows" aria-describedby="image-alt-help"/><small id="image-alt-help">Required when adding an image. It becomes the image’s alt text.</small></div></section>
-        <footer class="form-action-bar"><div class="visibility-control"><label for="status">Visibility</label><select id="status" name="status"><option value="draft" selected={values.status !== 'published'}>Draft</option><option value="published" selected={values.status === 'published'}>Published</option></select></div><button type="submit" class="save-post">Save post <span aria-hidden="true">→</span></button></footer>
+        <div class="form-split"><div class="form-primary"><div class="field-grid"><div class="field"><label for="title">Title</label><input id="title" name="title" value={values.title} maxlength="160" required /></div><div class="field"><label for="slug">URL slug</label><div class="slug-control"><span aria-hidden="true">/blog/</span><input id="slug" name="slug" value={values.slug} pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="100" readonly={existing?.status === 'published'} required /></div></div></div><div class="field"><label for="excerpt">Summary</label><input id="excerpt" name="excerpt" value={values.excerpt ?? ''} maxlength="320" /></div><div class="field markdown-field"><label for="content_md">Post body (Markdown)</label><textarea id="content_md" name="content_md" rows="16" maxlength="100000" placeholder="Write your post in Markdown…">{values.content_md}</textarea><small>Use headings, lists, code blocks, quotes, and standard Markdown images. The first image is used as the cover.</small></div></div><aside class="form-sidebar"><div class="field"><label for="category">Topic</label><input id="category" name="category" value={values.category ?? ''} maxlength="48" placeholder="e.g. Web security"/><small>Used as a filter and a small label on the blog.</small></div><section class="media-section" aria-labelledby="media-title"><div><h2 id="media-title">Cover image</h2><p>Upload a new cover to replace the first Markdown image.</p></div><img class="image-preview" data-image-preview hidden alt="Selected blog image preview"/><label class="dropzone" for="image"><span aria-hidden="true">⇧</span><strong data-upload-label>Click to replace the cover</strong><small>JPEG, PNG or WebP up to 8 MB. Metadata is stripped automatically.</small><input id="image" name="image" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="image-help"/></label><small id="image-help">Remove sensitive details before uploading.</small><div class="field"><label for="image_alt">Cover image description</label><input id="image_alt" name="image_alt" value={Astro.request.method === 'POST' ? imageAlt : ''} maxlength="300" placeholder="What the image shows" aria-describedby="image-alt-help"/><small id="image-alt-help">Required when replacing the cover.</small></div></section><section class="media-section"><div><h2>Inline image</h2><p>Add one image to the end of the post. Save, then repeat for another.</p></div><label class="dropzone" for="inline_image"><span aria-hidden="true">+</span><strong>Upload inline image</strong><small>JPEG, PNG or WebP up to 8 MB.</small><input id="inline_image" name="inline_image" type="file" accept="image/jpeg,image/png,image/webp"/></label><div class="field"><label for="inline_image_alt">Inline image description</label><input id="inline_image_alt" name="inline_image_alt" maxlength="300" placeholder="What the image shows"/></div></section>{postImages.length > 0 && <section class="media-section existing-images"><div><h2>Images in this post</h2><p>Select any image to remove it from the post when you save.</p></div>{postImages.map((item,index) => <label class="existing-image"><img src={item.url} alt={item.alt}/><span><input type="checkbox" name="remove_images" value={item.url}/> Remove image {index + 1}</span></label>)}</section>}<div class="visibility-control"><label for="status">Visibility</label><select id="status" name="status"><option value="draft" selected={values.status !== 'published'}>Draft</option><option value="published" selected={values.status === 'published'}>Published</option></select></div></aside></div>
+        <footer class="form-action-bar"><span>Changes redirect back to Blog posts.</span><button type="submit" class="save-post">Save post <span aria-hidden="true">→</span></button></footer>
       </form>
+      {!isNew && <form class="delete-item-form" action="/admin/delete" method="POST"><input type="hidden" name="kind" value="post"/><input type="hidden" name="id" value={id}/><button class="btn btn-danger" type="submit" data-delete-item data-item-name={values.title}>Delete post</button></form>}
       </>
     ) : <h1>{result?.error ? 'Couldn’t load the post' : 'Post not found'}</h1>}
   </div>
 </AdminLayout>
 <style>
-  .post-editor-shell{max-width:768px;margin:0 auto;padding:2rem 1.5rem}.back-action{display:inline-flex;align-items:center;min-height:36px;color:#94a3b8;text-decoration:none;font-size:.9rem;transition:color 160ms ease,transform 160ms ease}.back-action:hover,.back-action:focus-visible{color:#f8fafc;transform:translateX(-2px)}.editor-heading{margin:1.25rem 0 2rem}.editor-kicker{margin:0 0 .45rem;color:#60a5fa;font:.72rem var(--mono);letter-spacing:.08em;text-transform:uppercase}.editor-heading h1{margin:0;color:#f8fafc;font:700 1.875rem/1.2 var(--sans);letter-spacing:-.025em}.post-form{display:flex;flex-direction:column;gap:1.5rem}.field{display:flex;flex-direction:column;gap:.5rem;margin:0}.field label,.visibility-control label{color:#f8fafc;font-size:.875rem;font-weight:500}.field input,.field textarea,.visibility-control select{width:100%;padding:.625rem .875rem;border:1px solid #334155;border-radius:6px;background:#1e293b;color:#f8fafc;font:inherit;box-shadow:none;transition:border-color 160ms ease,box-shadow 160ms ease,background-color 160ms ease}.field input::placeholder,.field textarea::placeholder{color:#64748b}.field input:focus,.field textarea:focus,.visibility-control select:focus{outline:0;border-color:#3b82f6;background:#1f2937;box-shadow:0 0 0 3px rgba(59,130,246,.25)}.field input[readonly]{color:#94a3b8;cursor:not-allowed;background:#182230}.slug-control{display:flex;align-items:stretch;border:1px solid #334155;border-radius:6px;background:#1e293b;overflow:hidden;transition:border-color 160ms ease,box-shadow 160ms ease}.slug-control:focus-within{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.25)}.slug-control span{display:flex;align-items:center;padding:0 .75rem;border-right:1px solid #334155;color:#94a3b8;background:#182230;font:.85rem var(--mono)}.slug-control input{border:0;border-radius:0;font-family:var(--mono);box-shadow:none}.slug-control input:focus{box-shadow:none;background:#1f2937}.markdown-field textarea{min-height:320px;resize:vertical;font: .9rem/1.6 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}.field small,.media-section>div>p{color:#94a3b8;font-size:.75rem;line-height:1.4}.field small{margin:0}.media-section{display:flex;flex-direction:column;gap:1.25rem;padding:1.25rem;border:1px dashed #334155;border-radius:8px;background:rgba(30,41,59,.4)}.media-section>div:first-child{display:flex;flex-direction:column;gap:.3rem}.media-section h2{margin:0;color:#f8fafc;font-size:1rem;font-weight:600}.media-section p{margin:0}.media-section input[type=file]{padding:.35rem;background:#182230;color:#94a3b8}.media-section input[type=file]::file-selector-button{margin-right:.75rem;padding:.5rem .75rem;border:1px solid #3b82f6;border-radius:5px;background:#1e3a5f;color:#dbeafe;font:600 .8rem var(--sans);cursor:pointer;transition:background-color 160ms ease,border-color 160ms ease}.media-section input[type=file]::file-selector-button:hover{background:#2563eb;border-color:#2563eb;color:#fff}.form-action-bar{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;padding-top:1.5rem;border-top:1px solid #1e293b}.visibility-control{display:flex;flex-direction:column;gap:.5rem}.visibility-control select{width:auto;min-width:145px;padding:.625rem 2.25rem .625rem .875rem;cursor:pointer}.save-post{display:inline-flex;align-items:center;justify-content:center;gap:.55rem;min-height:42px;padding:.625rem 1.25rem;border:1px solid #3b82f6;border-radius:6px;background:#3b82f6;color:#fff;font:600 .9rem var(--sans);cursor:pointer;transition:background-color 160ms ease,transform 160ms ease,box-shadow 160ms ease}.save-post:hover{background:#2563eb;transform:translateY(-1px);box-shadow:0 8px 18px rgba(37,99,235,.22)}.save-post:focus-visible{outline:0;box-shadow:0 0 0 3px rgba(59,130,246,.25),0 8px 18px rgba(37,99,235,.22)}.save-post:active{transform:translateY(0)}.save-post span{transition:transform 160ms ease}.save-post:hover span{transform:translateX(3px)}@media(max-width:600px){.post-editor-shell{padding:1.5rem 1rem}.form-action-bar{align-items:stretch;flex-direction:column}.visibility-control select,.save-post{width:100%}}
+  .post-editor-shell{padding:2rem 0}.back-action{display:inline-flex;align-items:center;min-height:36px;color:#94a3b8;text-decoration:none;font-size:.9rem;transition:color 160ms ease,transform 160ms ease}.back-action:hover,.back-action:focus-visible{color:#f8fafc;transform:translateX(-2px)}.editor-heading{margin:1.25rem 0 2rem}.editor-kicker{margin:0 0 .45rem;color:#60a5fa;font:.72rem var(--mono);letter-spacing:.08em;text-transform:uppercase}.editor-heading h1{margin:0;color:#f8fafc;font:700 1.875rem/1.2 var(--sans);letter-spacing:-.025em}.post-form{display:flex;flex-direction:column;gap:1.5rem}.field,.visibility-control{display:flex;flex-direction:column;gap:.5rem;margin:0}.field label,.visibility-control label{color:#f8fafc;font-size:.875rem;font-weight:500}.field input,.field textarea,.visibility-control select{width:100%;padding:.65rem .875rem;border:1px solid #2d3b52;border-radius:8px;background:#162032;color:#f8fafc;font:inherit}.field input[readonly]{color:#94a3b8;cursor:not-allowed}.slug-control{display:flex;align-items:stretch;border:1px solid #2d3b52;border-radius:8px;background:#162032;overflow:hidden}.slug-control:focus-within{border-color:#38bdf8;box-shadow:0 0 0 3px rgba(56,189,248,.2)}.slug-control span{display:flex;align-items:center;padding:0 .75rem;border-right:1px solid #334155;color:#94a3b8;background:#0f172a;font:.85rem var(--mono)}.slug-control input{border:0;border-radius:0;font-family:var(--mono);box-shadow:none}.markdown-field textarea{min-height:420px;resize:vertical;font:.9rem/1.6 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}.media-section{display:flex;flex-direction:column;gap:1.25rem}.media-section h2,.media-section p{margin:0}.media-section p,.field small{color:#94a3b8;font-size:.75rem;line-height:1.4}.existing-images{border-top:1px solid var(--line);padding-top:1rem}.existing-image{display:grid;grid-template-columns:72px minmax(0,1fr);gap:.75rem;align-items:center;color:#cbd5e1;font-size:.78rem}.existing-image img{width:72px;height:54px;object-fit:cover;border:1px solid var(--line);border-radius:5px}.existing-image span{display:flex;align-items:center;gap:.5rem}.existing-image input{width:auto}.form-action-bar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.25rem 0;position:sticky;bottom:0;background:#0b111ae8;backdrop-filter:blur(8px);border-top:1px solid #1e293b;color:#94a3b8;font-size:.8rem}.save-post{display:inline-flex;align-items:center;justify-content:center;gap:.55rem;min-height:42px;padding:.625rem 1.25rem;border:1px solid #38bdf8;border-radius:8px;background:#38bdf8;color:#08202d;font:600 .9rem var(--sans);cursor:pointer;transition:filter 160ms ease,transform 160ms ease}.save-post:hover{filter:brightness(1.1);transform:translateY(-1px)}.save-post span{transition:transform 160ms ease}.save-post:hover span{transform:translateX(3px)}.dropzone>span{font-size:1.5rem;color:#38bdf8}@media(max-width:768px){.post-editor-shell{padding:1.5rem 0}.form-action-bar{align-items:stretch;flex-direction:column}.save-post{width:100%}}
 </style>
+<script>
+  const file = document.querySelector('#image') as HTMLInputElement | null;
+  const preview = document.querySelector('[data-image-preview]') as HTMLImageElement | null;
+  const label = document.querySelector('[data-upload-label]');
+  file?.addEventListener('change', () => { const next = file.files?.[0]; if (!next || !preview) return; preview.src = URL.createObjectURL(next); preview.hidden = false; preview.alt = 'Selected blog image preview'; if (label) label.textContent = `Replace ${next.name}`; });
+  document.querySelector<HTMLButtonElement>('[data-delete-item]')?.addEventListener('click', (event) => { if (!window.confirm(`Delete ${event.currentTarget.dataset.itemName || 'this post'}? This permanently removes its content and uploaded images.`)) event.preventDefault(); });
+</script>

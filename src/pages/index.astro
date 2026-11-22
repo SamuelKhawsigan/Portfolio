@@ -2,15 +2,22 @@
 export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import { getCollection } from 'astro:content';
-import { getAchievements, getGalleryPhotos, getPublicProjects, getSiteSettings, publicImageUrl } from '../lib/site-content';
+import { getAchievements, getGalleryPhotos, getHomePortraitSlides, getPublicProjects, getSiteSettings, publicImageUrl } from '../lib/site-content';
+import { createPublicBlogClient } from '../lib/supabase';
 
-const [settings, photos, achievements, managedProjects] = await Promise.all([getSiteSettings(), getGalleryPhotos(), getAchievements(), getPublicProjects()]);
+const [settings, photos, portraitSlides, achievements, managedProjects] = await Promise.all([getSiteSettings(), getGalleryPhotos(), getHomePortraitSlides(), getAchievements(), getPublicProjects()]);
 const projects = await getCollection('projects', ({ data }) => !data.placeholder);
 const featured = projects.find(({ data }) => data.featured) ?? projects[0];
 const managedFeatured = managedProjects.find(project => project.featured) ?? managedProjects[0];
 const nightfall = achievements.find(({ slug }) => slug === 'htb-nightfall') ?? achievements.find(({ category }) => category === 'ctf');
 const nightfallHeading = nightfall?.title.includes(':') ? nightfall.title.split(':').at(-1)?.trim() : nightfall?.title;
 const summit = photos.find(({ slug }) => slug === 'grow-ai-summit') ?? photos.at(-1);
+const blogClient = createPublicBlogClient();
+const latestResult = blogClient && await blogClient.from('posts').select('slug,title,excerpt,category,content_md,published_at').eq('status', 'published').order('published_at', { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+const latestPost = latestResult?.data;
+const latestCover = latestPost?.content_md.match(/!\[[^\]]*\]\(([^\s)]+)/)?.[1] ?? null;
+const latestWords = (latestPost?.content_md ?? '').replace(/```[\s\S]*?```/g, '').trim().split(/\s+/).filter(Boolean).length;
+const latestReadTime = Math.max(1, Math.ceil(latestWords / 220));
 ---
 <Layout>
   <section class="portrait-intro" aria-labelledby="name">
@@ -20,9 +27,12 @@ const summit = photos.find(({ slug }) => slug === 'grow-ai-summit') ?? photos.at
       <p class="intro-copy">{settings.home_intro}</p>
       <a class="editorial-link" href="/profile/">Read my profile <span aria-hidden="true">↗</span></a>
     </div>
-    <figure>
-      <img src={publicImageUrl(settings.profile_portrait_path) ?? '/images/about/samuel-portrait.webp'} alt={settings.profile_portrait_alt} width="640" height="640" fetchpriority="high" />
-      <figcaption>{settings.home_portrait_caption}</figcaption>
+    <figure class="portrait-carousel" data-portrait-carousel aria-label="Portrait photo carousel">
+      <div class="portrait-slides">
+        {portraitSlides.map((slide, index) => <img class:list={['portrait-slide', { 'is-active': index === 0 }]} src={slide.src} alt={slide.alt} width="640" height="640" fetchpriority={index === 0 ? 'high' : undefined} loading={index === 0 ? undefined : 'lazy'} data-portrait-slide data-caption={slide.caption} />)}
+      </div>
+      {portraitSlides.length > 1 && <><div class="portrait-carousel-controls"><button type="button" data-portrait-prev aria-label="Show previous portrait">←</button><button type="button" data-portrait-next aria-label="Show next portrait">→</button></div><div class="portrait-carousel-dots" aria-label="Choose portrait photo">{portraitSlides.map((slide, index) => <button type="button" class:list={{ 'is-active': index === 0 }} data-portrait-dot={index} aria-label={`Show photo ${index + 1}: ${slide.caption || 'portrait'}`} aria-current={index === 0 ? 'true' : undefined}/>)}</div></>}
+      <figcaption data-portrait-caption>{portraitSlides[0]?.caption ?? settings.home_portrait_caption}</figcaption>
     </figure>
   </section>
 
@@ -51,6 +61,7 @@ const summit = photos.find(({ slug }) => slug === 'grow-ai-summit') ?? photos.at
         <figure><img src={nightfall.src} alt={nightfall.alt} width={nightfall.width ?? undefined} height={nightfall.height ?? undefined} loading="lazy" decoding="async" /><figcaption>Actual participation record.</figcaption></figure>
       </article>
     )}
+    {latestPost && <article class="home-blog-feature"><div class="home-blog-copy"><p class="edition-label">Field notes</p><h3>Learning notes, lab detours, and things worth writing down.</h3><p>Short reports from the workbench. The useful bits, including when the useful bit is that something broke.</p><a class="editorial-link" href="/blog/">Explore blog <span aria-hidden="true">→</span></a></div><a class="home-blog-card" href={`/blog/${encodeURIComponent(latestPost.slug)}`}><div class="home-blog-image">{latestCover ? <img src={latestCover} alt="" loading="lazy" decoding="async"/> : <span>NO COVER IMAGE</span>}</div><div class="home-blog-card-copy"><p>{latestPost.category?.trim() || 'Notes'} / Latest article</p><h4>{latestPost.title}</h4>{latestPost.excerpt && <span>{latestPost.excerpt}</span>}<small>{latestPost.published_at && new Date(latestPost.published_at).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kuala_Lumpur'})} · {latestReadTime} min read</small></div></a></article>}
   </section>
 
   {summit && (
@@ -64,12 +75,25 @@ const summit = photos.find(({ slug }) => slug === 'grow-ai-summit') ?? photos.at
       </figure>
     </section>
   )}
-
-  <section class="home-section journal" aria-labelledby="journal-title">
-    <div><span class="section-number">04 / NOTES</span><h2 id="journal-title">{settings.home_notes_heading}</h2><p>{settings.home_notes_intro}</p></div>
-    <a class="editorial-link" href="/blog/">Read the blog <span aria-hidden="true">↗</span></a>
-  </section>
 </Layout>
+
+<script>
+  const carousel = document.querySelector<HTMLElement>('[data-portrait-carousel]');
+  const slides = [...document.querySelectorAll<HTMLImageElement>('[data-portrait-slide]')];
+  const dots = [...document.querySelectorAll<HTMLButtonElement>('[data-portrait-dot]')];
+  const caption = document.querySelector<HTMLElement>('[data-portrait-caption]');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let activeSlide = 0;
+  let timer: number | undefined;
+  const showSlide = (next: number) => { if (!slides.length) return; activeSlide = (next + slides.length) % slides.length; slides.forEach((slide, index) => slide.classList.toggle('is-active', index === activeSlide)); dots.forEach((dot, index) => { dot.classList.toggle('is-active', index === activeSlide); dot.setAttribute('aria-current', index === activeSlide ? 'true' : 'false'); }); if (caption) caption.textContent = slides[activeSlide].dataset.caption ?? ''; };
+  const restart = () => { if (timer) window.clearInterval(timer); if (!reduceMotion && slides.length > 1) timer = window.setInterval(() => showSlide(activeSlide + 1), 5200); };
+  document.querySelector<HTMLButtonElement>('[data-portrait-prev]')?.addEventListener('click', () => { showSlide(activeSlide - 1); restart(); });
+  document.querySelector<HTMLButtonElement>('[data-portrait-next]')?.addEventListener('click', () => { showSlide(activeSlide + 1); restart(); });
+  dots.forEach((dot, index) => dot.addEventListener('click', () => { showSlide(index); restart(); }));
+  carousel?.addEventListener('mouseenter', () => { if (timer) window.clearInterval(timer); });
+  carousel?.addEventListener('mouseleave', restart);
+  restart();
+</script>
 
 <style>
   .portrait-intro {
@@ -90,9 +114,11 @@ const summit = photos.find(({ slug }) => slug === 'grow-ai-summit') ?? photos.at
   }
   .portrait-intro .edition-label { color: #536874; }
   .portrait-intro h1 {
+    font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, ui-serif, serif;
+    font-weight: 700;
     font-size: clamp(3.4rem, 6.8vw, 6.4rem);
-    line-height: .88;
-    letter-spacing: -.075em;
+    line-height: .84;
+    letter-spacing: -.06em;
     margin: 2.7rem 0 2rem;
   }
   .portrait-intro .intro-copy { color: #3f5663; max-width: 36ch; font-size: clamp(1.15rem, 1.8vw, 1.4rem); line-height: 1.42; border-bottom: 1px solid #a5b8c2; padding-bottom: 1.5rem; }
@@ -101,6 +127,18 @@ const summit = photos.find(({ slug }) => slug === 'grow-ai-summit') ?? photos.at
   .portrait-intro figure { position: relative; margin: 0; height: 100%; background: var(--pane); }
   .portrait-intro figure::before { inset: 1rem; border-color: var(--paper); z-index: 1; }
   .portrait-intro img { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; border-radius: 0; filter: saturate(.85); }
+  .portrait-carousel { overflow:hidden; isolation:isolate; background:linear-gradient(145deg,#0d3448,#122537 48%,#286c71); }
+  .portrait-carousel::after { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background:linear-gradient(135deg,rgba(8,28,45,.42),transparent 45%,rgba(167,233,207,.18)),linear-gradient(0deg,rgba(8,22,34,.55),transparent 37%); mix-blend-mode:normal; }
+  .portrait-slides { position:absolute; inset:0; }
+  .portrait-slide { position:absolute; inset:0; z-index:0; opacity:0; transform:scale(1.045); transition:opacity 700ms ease,transform 4.8s cubic-bezier(.2,.8,.2,1),filter 700ms ease; }
+  .portrait-slide.is-active { opacity:1; transform:scale(1); }
+  .portrait-carousel-controls { position:absolute; z-index:3; right:1.55rem; top:1.55rem; display:flex; gap:.45rem; }
+  .portrait-carousel-controls button,.portrait-carousel-dots button { appearance:none; border:1px solid rgba(231,237,240,.72); background:#102638a8; color:#f2fbfd; cursor:pointer; transition:transform 180ms ease,background-color 180ms ease,border-color 180ms ease; }
+  .portrait-carousel-controls button { display:grid; place-items:center; width:38px; height:38px; border-radius:999px; font-size:1.05rem; }
+  .portrait-carousel-controls button:hover,.portrait-carousel-controls button:focus-visible { border-color:var(--tertiary); background:var(--tertiary); color:#10202a; transform:translateY(-2px); }
+  .portrait-carousel-dots { position:absolute; z-index:3; right:1.55rem; bottom:1.55rem; display:flex; align-items:center; gap:.45rem; }
+  .portrait-carousel-dots button { width:7px; height:7px; padding:0; border-radius:999px; opacity:.72; }
+  .portrait-carousel-dots button.is-active { width:28px; opacity:1; background:var(--tertiary); border-color:var(--tertiary); }
   .portrait-intro figcaption {
     position: absolute;
     bottom: 1rem;
@@ -109,16 +147,16 @@ const summit = photos.find(({ slug }) => slug === 'grow-ai-summit') ?? photos.at
     background: var(--bg);
     color: var(--ink);
     font: .72rem/1.4 var(--mono);
-    z-index: 2;
+    z-index: 3;
   }
   figure { margin: 0; }
   img { display: block; max-width: 100%; }
   .home-section { margin-top: clamp(4.5rem, 8vw, 7rem); }
   .portrait-intro + .home-section { margin-top: clamp(3rem, 4vw, 4rem); }
-  .section-top, .journal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem 2rem; }
+  .section-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem 2rem; }
   .section-top { align-items: end; padding-bottom: 1.5rem; border-bottom: 1px solid var(--line); }
   .section-number { display: block; color: var(--accent); font: 600 .72rem/1.5 var(--mono); letter-spacing: .08em; margin-bottom: .8rem; }
-  .section-top h2, .journal h2 { font: 600 clamp(2rem, 4vw, 3.4rem)/1.05 var(--sans); letter-spacing: -.04em; margin: 0; }
+  .section-top h2 { font: 600 clamp(2rem, 4vw, 3.4rem)/1.05 var(--sans); letter-spacing: -.04em; margin: 0; }
   .work-feature {
     display: grid;
     grid-template-columns: minmax(0, .75fr) minmax(0, 1.25fr);
@@ -131,31 +169,34 @@ const summit = photos.find(({ slug }) => slug === 'grow-ai-summit') ?? photos.at
   }
   .work-feature > div { max-width: 390px; }
   .work-feature h3 { font: 600 clamp(2.8rem, 5vw, 5rem)/.98 var(--sans); letter-spacing: -.055em; margin: 0 0 1.5rem; }
-  .work-feature p, .journal p { color: var(--muted); max-width: 50ch; }
+  .work-feature p { color: var(--muted); max-width: 50ch; }
   .work-feature strong { color: var(--ink); }
   .work-feature figure { min-width: 0; }
   .work-feature img { width: 100%; height: auto; border: 1px solid var(--line); }
   .work-feature figcaption { color: var(--muted); font: .75rem/1.5 var(--mono); margin-top: .8rem; }
+  .home-blog-feature { display:grid; grid-template-columns:minmax(0,.9fr) minmax(320px,.85fr); gap:clamp(2rem,6vw,6rem); align-items:center; margin-top:clamp(2rem,5vw,4rem); padding-top:clamp(2rem,5vw,4rem); border-top:1px solid var(--line); }
+  .home-blog-copy { max-width:35rem; }.home-blog-copy h3 { margin:.7rem 0 1rem; font:600 clamp(2rem,4vw,3.8rem)/1.02 var(--sans); letter-spacing:-.05em; }.home-blog-copy p:not(.edition-label) { color:var(--muted); font-size:1.05rem; }.home-blog-copy .editorial-link { margin-top:.9rem; }
+  .home-blog-card { overflow:hidden; border:1px solid var(--line); border-radius:12px; background:var(--pane); color:var(--ink); text-decoration:none; transition:transform 180ms ease,border-color 180ms ease,box-shadow 180ms ease; }.home-blog-card:hover,.home-blog-card:focus-visible { border-color:var(--accent); color:var(--ink); transform:translateY(-3px); box-shadow:0 16px 32px #00000028; }.home-blog-image { aspect-ratio:16/9; background:#0c1822; overflow:hidden; }.home-blog-image img { width:100%; height:100%; object-fit:cover; transition:transform 220ms ease; }.home-blog-card:hover .home-blog-image img { transform:scale(1.035); }.home-blog-image span { display:grid; place-items:center; width:100%; height:100%; color:var(--accent); font:.72rem var(--mono); letter-spacing:.1em; }.home-blog-card-copy { display:flex; flex-direction:column; gap:.65rem; padding:1.25rem; }.home-blog-card-copy p { margin:0; color:var(--accent); font:.7rem var(--mono); text-transform:uppercase; letter-spacing:.08em; }.home-blog-card-copy h4 { margin:0; font:600 clamp(1.3rem,2vw,2rem)/1.1 var(--sans); letter-spacing:-.035em; }.home-blog-card-copy span { color:var(--muted); }.home-blog-card-copy small { margin-top:.35rem; color:var(--muted); font:.72rem var(--mono); }
   .summit-photo { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(190px, .5fr); align-items: end; gap: clamp(1.5rem, 5vw, 4rem); max-width: none; margin: 2rem 0 0; }
   .summit-photo a { display: block; text-decoration: none; }
   .summit-photo img { width: 100%; max-height: 550px; object-fit: cover; object-position: center 30%; border-radius: 0; }
   .summit-photo figcaption { display: flex; flex-direction: column; align-items: flex-start; gap: 1.5rem; font: 600 clamp(1.3rem, 2vw, 1.8rem)/1.2 var(--sans); color: var(--ink); padding: 0 0 .4rem; }
-  .journal { border-top: 1px solid var(--line); padding-top: 1.3rem; }
-  .journal p { font-size: 1.15rem; margin: .5rem 0 0; }
   @media (max-width: 800px) {
     .portrait-intro { min-height: 0; }
     .portrait-intro > div { padding: clamp(1.8rem, 4vw, 3rem); }
     .portrait-intro h1 { font-size: clamp(3rem, 8vw, 5rem); margin: 3rem 0 2rem; }
-    .work-feature { gap: 2rem; }
+    .work-feature { gap: 2rem; }.home-blog-feature { gap:2rem; }
   }
   @media (max-width: 680px) {
-    .portrait-intro, .work-feature, .summit-photo { grid-template-columns: 1fr; }
+    .portrait-intro, .work-feature, .summit-photo, .home-blog-feature { grid-template-columns: 1fr; }
     .portrait-intro > div { min-height: 450px; padding: 2rem 1.5rem; }
     .portrait-intro h1 { font-size: clamp(3.2rem, 14vw, 5rem); }
     .portrait-intro figure, .portrait-intro img { height: auto; max-height: 480px; }
+    .portrait-carousel { min-height:400px; }.portrait-carousel .portrait-slide { height:100%!important; }.portrait-carousel-controls { right:1rem; top:1rem; }.portrait-carousel-dots { right:1rem; bottom:1rem; }
     .work-feature { padding-top: 2rem; }
     .summit-photo { gap: 1rem; }
   }
+  @media (prefers-reduced-motion: reduce) { .portrait-slide { transition:none; } }
   @media (max-width: 380px) {
     .portrait-intro > div { min-height: 420px; }
   }

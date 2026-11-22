@@ -26,7 +26,7 @@ const sections: { title: string; fields: { key: SiteKey; label: string }[] }[] =
     { key: 'profile_learning', label: 'Currently learning' }, { key: 'profile_certifications_note', label: 'Certification note' },
   ] },
   { title: 'Events and setup', fields: [
-    { key: 'events_intro', label: 'Events introduction' }, { key: 'uses_intro', label: 'Setup introduction' },
+    { key: 'events_intro', label: 'Events introduction' }, { key: 'gallery_scroll_duration', label: 'Gallery arrow scroll duration (milliseconds)' }, { key: 'uses_intro', label: 'Setup introduction' },
     { key: 'uses_hardware', label: 'Hardware' }, { key: 'uses_os', label: 'Operating system' },
     { key: 'uses_editor', label: 'Editor' }, { key: 'uses_terminal', label: 'Terminal' },
     { key: 'uses_web', label: 'Web testing' }, { key: 'uses_re', label: 'Reverse engineering' },
@@ -37,6 +37,12 @@ const sections: { title: string; fields: { key: SiteKey; label: string }[] }[] =
     { key: 'contact_github', label: 'GitHub URL' }, { key: 'contact_linkedin', label: 'LinkedIn URL' },
     { key: 'footer_heading', label: 'Footer heading' }, { key: 'footer_intro', label: 'Footer introduction' },
   ] },
+];
+const shortTextKeys = new Set<SiteKey>(['home_portrait_caption', 'home_work_heading', 'home_events_heading', 'home_notes_heading', 'profile_internship_dates', 'gallery_scroll_duration']);
+const profileGroups = [
+  { title: 'Biography & portrait', fields: sections[1].fields.slice(0, 4), className: 'profile-bio' },
+  { title: 'Technical stack', fields: sections[1].fields.slice(4, 7), className: 'profile-tools' },
+  { title: 'Experience', fields: sections[1].fields.slice(7), className: 'profile-experience' },
 ];
 
 const loaded = await supabase.from('site_settings').select('key,value');
@@ -85,17 +91,40 @@ if (Astro.request.method === 'POST' && !loaded.error) {
 ---
 <AdminLayout title="Site text">
   <div class="editor-page"><header class="admin-page-header"><div><p class="admin-page-eyebrow">Content / Site text</p><h1>Site text</h1><p class="admin-page-subtitle">Edit words, social links, profile details, and your portrait. Layout and colour choices stay in the site code.</p></div><a class="secondary-button" href="/">View site <span aria-hidden="true">↗</span></a></header>
-  {error ? <p class="msg msg-err" role="alert">{error}</p> : Astro.url.searchParams.has('saved') && <p class="msg msg-ok" role="status">Site text saved.</p>}
+  {error && <p class="msg msg-err" role="alert">{error}</p>}
+  <nav class="site-editor-jumps" aria-label="Site editor sections"><a href="#portrait">Portrait</a><a href="#home">Home</a><a href="#profile">Profile</a><a href="#contact">Contact</a></nav>
   <form class="editor-form site-editor-form" method="POST" enctype="multipart/form-data">
-    <section class="editor-section"><h2>Portrait</h2><p class="help">Used on Home and Profile. Use a photo of yourself and remove sensitive metadata before uploading.</p><div class="field upload-box"><label for="portrait">Replace portrait (optional)</label><input id="portrait" name="portrait" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="portrait-help"/><small id="portrait-help">JPEG, PNG or WebP up to 8 MB. Uploads are converted to WebP and stripped of metadata.</small></div></section>
-    {sections.map(section => <section class="editor-section"><h2>{section.title}</h2><div class="site-fields">{section.fields.map(({key,label}) => <div class="field"><label for={key}>{label}</label>{key === 'contact_email' || key === 'contact_github' || key === 'contact_linkedin' ? <input id={key} name={key} value={values[key]} type={key === 'contact_email' ? 'email' : 'url'} maxlength="1200" required /> : <textarea id={key} name={key} rows="2" maxlength="1200">{values[key]}</textarea>}</div>)}</div></section>)}
+    <section class="editor-section" id="portrait"><h2>Portrait</h2><p class="help">Used on Home and Profile. Use a photo of yourself and remove sensitive metadata before uploading.</p><label class="dropzone" for="portrait"><span aria-hidden="true">⇧</span><strong data-upload-label>Click to upload or drag and drop</strong><small>JPEG, PNG or WebP up to 8 MB. Metadata is stripped automatically.</small><input id="portrait" name="portrait" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="portrait-help"/></label><small id="portrait-help">The image is converted to WebP before it is saved.</small></section>
+    {sections.map(section => section.title === 'Profile' ? <section class="editor-section" id="profile"><h2>Profile</h2>{profileGroups.map(group => <div class={`profile-group ${group.className}`}><p class="subgroup-label">{group.title}</p><div class="site-fields">{group.fields.map(({key,label}) => <div class="field"><label for={key}>{label}<span class="needs-copy" hidden>Needs copy</span></label>{shortTextKeys.has(key) ? <input id={key} name={key} value={values[key]} type="text" maxlength="1200" required/> : <textarea id={key} name={key} rows="3" maxlength="1200">{values[key]}</textarea>}</div>)}</div></div>)}</section> : <section class="editor-section" id={section.title === 'Home' ? 'home' : section.title === 'Contact and footer' ? 'contact' : undefined}><h2>{section.title}</h2><div class="site-fields">{section.fields.map(({key,label}) => <div class={`field ${key === 'home_intro' ? 'field--wide' : ''}`}><label for={key}>{label}<span class="needs-copy" hidden>Needs copy</span></label>{key === 'contact_email' || key === 'contact_github' || key === 'contact_linkedin' ? <input id={key} name={key} value={values[key]} type={key === 'contact_email' ? 'email' : 'url'} maxlength="1200" required /> : shortTextKeys.has(key) ? <input id={key} name={key} value={values[key]} type="text" maxlength="1200" required/> : <textarea id={key} name={key} rows="3" maxlength="1200">{values[key]}</textarea>}</div>)}</div></section>)}
     <div class="form-actions"><span class="save-hint">Changes appear on the site without a rebuild.</span><button class="btn btn-primary" type="submit" disabled={!!loaded.error}>Save changes</button></div>
   </form></div>
 </AdminLayout>
 <style>
-  .site-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem}
+  .site-editor-jumps{position:sticky;top:.75rem;z-index:2;display:flex;gap:.5rem;flex-wrap:wrap;margin:0 0 1rem;padding:.6rem;border:1px solid var(--line);border-radius:999px;background:#0b111ae8;backdrop-filter:blur(10px)}
+  .site-editor-jumps a{display:inline-flex;align-items:center;min-height:32px;padding:.3rem .75rem;border:1px solid #334155;border-radius:999px;background:#162032;color:#cbd5e1;text-decoration:none;font-size:.8rem;font-weight:600;transition:background-color 160ms ease,border-color 160ms ease,color 160ms ease}.site-editor-jumps a:hover,.site-editor-jumps a:focus-visible{border-color:var(--accent);background:#20384a;color:#fff}
+  .site-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1.5rem}
   .site-fields .field{min-width:0}
-  .site-fields textarea{min-height:76px}
+  .site-fields .field--wide{grid-column:span 2}
+  .site-fields textarea{min-height:88px;field-sizing:content;font: .9rem/1.55 var(--sans);overflow:hidden;scrollbar-width:thin;scrollbar-color:#334155 #0f172a}
+  .site-fields input[type=text]{height:42px;padding:0 .875rem}
+  .profile-group{padding-top:1.25rem;margin-top:1.25rem;border-top:1px solid #1e293b}.profile-group:first-of-type{padding-top:0;margin-top:0;border-top:0}.subgroup-label{margin:0 0 .8rem;color:#64748b;font:.7rem var(--mono);letter-spacing:.08em;text-transform:uppercase}.profile-tools .site-fields{grid-template-columns:repeat(3,minmax(0,1fr))}.profile-experience .site-fields{grid-template-columns:minmax(180px,.7fr) minmax(0,2fr)}.profile-experience .field:last-child{grid-column:span 2}.needs-copy{display:none;margin-left:.5rem;padding:.16rem .42rem;border:1px solid #79613b;border-radius:999px;background:#3b2f18;color:#e8c276;font:.62rem var(--mono);letter-spacing:0;text-transform:uppercase}.field.is-placeholder input,.field.is-placeholder textarea{border-style:dashed;border-color:#475569}.field.is-placeholder .needs-copy{display:inline-flex}
   .save-hint{color:var(--muted);font-size:.8rem}
-  @media(max-width:720px){.site-fields{grid-template-columns:1fr}}
+  .dropzone>span{font-size:1.5rem;color:var(--accent)}#portrait-help{display:block;margin-top:.65rem;color:var(--muted);font-size:.75rem}
+  @media(max-width:720px){.site-fields,.profile-tools .site-fields,.profile-experience .site-fields{grid-template-columns:1fr}.site-fields .field--wide,.profile-experience .field:last-child{grid-column:auto}.site-editor-jumps{border-radius:12px}}
 </style>
+<script>
+  const file = document.querySelector('#portrait') as HTMLInputElement | null;
+  const label = document.querySelector('[data-upload-label]');
+  file?.addEventListener('change', () => { const next = file.files?.[0]; if (next && label) label.textContent = `Replace ${next.name}`; });
+  document.querySelectorAll<HTMLTextAreaElement>('.site-editor-form textarea').forEach((textarea) => {
+    const resize = () => { textarea.style.height = 'auto'; textarea.style.height = `${textarea.scrollHeight}px`; };
+    resize();
+    textarea.addEventListener('input', resize);
+  });
+  document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('.site-editor-form input:not([type=file]), .site-editor-form textarea').forEach((field) => {
+    const wrap = field.closest('.field');
+    const mark = () => wrap?.classList.toggle('is-placeholder', field.value.trim().startsWith('[PLACEHOLDER:'));
+    mark();
+    field.addEventListener('input', mark);
+  });
+</script>

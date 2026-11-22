@@ -1,0 +1,56 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getAdminClient } from '../../../lib/auth';
+import { uploadPortfolioImage } from '../../../lib/admin-media';
+const supabase = await getAdminClient(Astro);
+if (!supabase) return Astro.redirect('/admin/login/');
+const id = Astro.params.id ?? '';
+const isNew = id === 'new';
+const validId = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id);
+const loaded = !isNew && validId ? await supabase.from('home_portrait_slides').select('*').eq('id', id).maybeSingle() : null;
+const existing = loaded?.data;
+if (!isNew && !existing) Astro.response.status = loaded?.error ? 503 : 404;
+let values = existing ?? { caption: '', alt: '', image_path: '', display_order: 20, status: 'draft' };
+let error = '';
+const imageUrl = (path: string) => path.startsWith('/') ? path : supabase.storage.from('portfolio-gallery').getPublicUrl(path).data.publicUrl;
+
+if (Astro.request.method === 'POST' && (isNew || existing)) {
+  const origin = Astro.request.headers.get('origin');
+  if (origin && origin !== Astro.url.origin) error = 'This request did not come from the carousel editor.';
+  else {
+    const form = await Astro.request.formData();
+    const read = (key: string) => String(form.get(key) ?? '').trim();
+    values = { ...values, caption: read('caption'), alt: read('alt'), display_order: Number(read('display_order')), status: read('status') };
+    const file = form.get('photo');
+    if (values.caption.length > 120 || !values.alt || values.alt.length > 300 || !Number.isInteger(values.display_order) || Math.abs(values.display_order) > 100000 || !['draft','published'].includes(values.status)) error = 'Add an image description and check the caption, order and visibility.';
+    else if (isNew && !(file instanceof File && file.size > 0)) error = 'Choose a photo to upload.';
+    else {
+      let uploadedPath = '';
+      if (file instanceof File && file.size > 0) { const upload = await uploadPortfolioImage(supabase, file, 'home'); error = upload.error; uploadedPath = upload.path; if (uploadedPath) values.image_path = uploadedPath; }
+      if (!error) {
+        const row = { caption: values.caption, alt: values.alt, image_path: values.image_path, display_order: values.display_order, status: values.status, updated_at: new Date().toISOString() };
+        const save = isNew ? await supabase.from('home_portrait_slides').insert(row).select('id').single() : await supabase.from('home_portrait_slides').update(row).eq('id', id).select('id').maybeSingle();
+        if (save.data) return Astro.redirect('/admin/home-slides/?saved=1', 303);
+        if (uploadedPath) await supabase.storage.from('portfolio-gallery').remove([uploadedPath]);
+        error = 'Couldn’t save the carousel photo. Apply migration 008 and try again.';
+      }
+    }
+  }
+  if (error && Astro.response.status === 200) Astro.response.status = 400;
+}
+---
+<AdminLayout title={isNew ? 'Add carousel photo' : 'Edit carousel photo'}>
+  <div class="editor-page editor-page--form"><a class="back-action" href="/admin/home-slides/">← All carousel photos</a>
+  {isNew || existing ? <><header class="admin-page-header"><div><p class="admin-page-eyebrow">Content / Home carousel</p><h1>{isNew ? 'Add carousel photo' : 'Edit carousel photo'}</h1><p class="admin-page-subtitle">The carousel rotates published photos every few seconds. Set an order to choose its sequence.</p></div></header>
+  {error && <p class="msg msg-err" role="alert">{error}</p>}
+  <form class="editor-form" method="POST" enctype="multipart/form-data"><div class="form-split"><div class="form-primary"><div class="field"><label for="caption">Caption</label><input id="caption" name="caption" value={values.caption} maxlength="120" placeholder="A short caption shown over the photo"/><small>Optional, but useful context for each image.</small></div><div class="field"><label for="alt">Image description</label><textarea id="alt" name="alt" rows="4" maxlength="300" required>{values.alt}</textarea><small>Describe the photo for people using screen readers.</small></div></div><aside class="form-sidebar">{values.image_path && <img class="image-preview" data-image-preview src={imageUrl(values.image_path)} alt={values.alt || 'Current carousel photo'}/>}<label class="dropzone" for="photo"><span aria-hidden="true">⇧</span><strong data-upload-label>Click to upload or drag and drop</strong><small>JPEG, PNG or WebP up to 8 MB.</small><input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" required={isNew}/></label><div class="field-grid"><div class="field"><label for="display_order">Order</label><input id="display_order" name="display_order" type="number" value={values.display_order} min="-100000" max="100000" required/></div><div class="field"><label for="status">Visibility</label><select id="status" name="status"><option value="draft" selected={values.status === 'draft'}>Draft</option><option value="published" selected={values.status === 'published'}>Published</option></select></div></div></aside></div><div class="form-actions"><button class="btn btn-primary" type="submit">Save carousel photo</button></div></form>
+  {!isNew && <form class="delete-item-form" action="/admin/delete" method="POST"><input type="hidden" name="kind" value="home_slide"/><input type="hidden" name="id" value={id}/><button class="btn btn-danger" type="submit" data-delete-item data-item-name={values.caption || 'this carousel photo'}>Delete photo</button></form>}
+  </> : <h1>{loaded?.error ? 'Couldn’t load carousel photo' : 'Carousel photo not found'}</h1>}</div>
+</AdminLayout>
+<script>
+  const file = document.querySelector('#photo') as HTMLInputElement | null;
+  const label = document.querySelector('[data-upload-label]');
+  file?.addEventListener('change', () => { const next = file.files?.[0]; if (!next) return; const preview = document.querySelector('[data-image-preview]') as HTMLImageElement | null; if (preview) preview.src = URL.createObjectURL(next); else { const img = document.createElement('img'); img.className = 'image-preview'; img.dataset.imagePreview = ''; img.src = URL.createObjectURL(next); img.alt = 'Selected carousel photo preview'; file.closest('.form-sidebar')?.prepend(img); } if (label) label.textContent = `Replace ${next.name}`; });
+  document.querySelector<HTMLButtonElement>('[data-delete-item]')?.addEventListener('click', (event) => { if (!window.confirm(`Delete ${event.currentTarget.dataset.itemName || 'this photo'}? This cannot be undone.`)) event.preventDefault(); });
+</script>

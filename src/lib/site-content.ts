@@ -25,6 +25,7 @@ export const siteDefaults = {
   profile_learning: '[PLACEHOLDER] What I’m studying, where I’m stuck, and what I’m trying next.',
   profile_certifications_note: 'These are completion and participation records. DataCamp GitHub Foundations is a course completion. In-progress certifications: [PLACEHOLDER].',
   events_intro: 'Workshops, visits, and the occasional group photo.',
+  gallery_scroll_duration: '420',
   uses_intro: 'Setup details pending. Nothing here is a recommendation until I’ve actually used it.',
   uses_hardware: '[PLACEHOLDER] Hardware, memory, storage, and virtualisation.',
   uses_os: '[PLACEHOLDER] Distro and version.',
@@ -80,24 +81,46 @@ export type GalleryPhoto = {
   src: string;
   width: number | null;
   height: number | null;
+  linkedin_url?: string | null;
+  event_slug?: string | null;
 };
+
+export type HomePortraitSlide = {
+  id?: string;
+  caption: string;
+  alt: string;
+  src: string;
+};
+
+export async function getHomePortraitSlides(): Promise<HomePortraitSlide[]> {
+  const client = createPublicBlogClient();
+  const fallback = [{ caption: siteDefaults.home_portrait_caption, alt: siteDefaults.profile_portrait_alt, src: siteDefaults.profile_portrait_path }];
+  if (!client) return fallback;
+  const { data, error } = await client.from('home_portrait_slides')
+    .select('id,caption,alt,image_path').eq('status', 'published').order('display_order', { ascending: true });
+  if (error || !data?.length) return fallback;
+  return data.map((slide) => ({ id: slide.id, caption: slide.caption, alt: slide.alt,
+    src: slide.image_path.startsWith('/') ? slide.image_path : client.storage.from('portfolio-gallery').getPublicUrl(slide.image_path).data.publicUrl,
+  }));
+}
 
 const fallbackPhotos: GalleryPhoto[] = evidence.photos.map((photo) => ({
   slug: photo.image, title: photo.title, summary: photo.summary, alt: photo.alt,
   src: `/images/about/${photo.image}.webp`, width: photo.width, height: photo.height,
+  event_slug: photo.image,
 }));
 
 export async function getGalleryPhotos(): Promise<GalleryPhoto[]> {
   const client = createPublicBlogClient();
   if (!client) return fallbackPhotos;
   const { data, error } = await client.from('gallery_items')
-    .select('id,slug,title,summary,alt,image_path,width,height')
+    .select('id,slug,title,summary,alt,image_path,width,height,linkedin_url,event_slug')
     .eq('status', 'published')
     .order('display_order', { ascending: true });
   if (error || !data) return fallbackPhotos;
   return data.map((photo) => ({
     id: photo.id, slug: photo.slug, title: photo.title, summary: photo.summary,
-    alt: photo.alt, width: photo.width, height: photo.height,
+    alt: photo.alt, width: photo.width, height: photo.height, linkedin_url: photo.linkedin_url, event_slug: photo.event_slug,
     src: photo.image_path.startsWith('/') ? photo.image_path
       : client.storage.from('portfolio-gallery').getPublicUrl(photo.image_path).data.publicUrl,
   }));

@@ -5,5 +5,5 @@ import { getSiteSettings } from '../lib/site-content';
 const settings = await getSiteSettings();
 ---
 <Layout title="Contact" description="Contact Samuel Khawsigan by email, GitHub, or LinkedIn.">
-  <div class="prose"><div class="eyebrow">/ contact</div><h1>Send a message.</h1><p>{settings.contact_intro}</p><div class="contacts"><a href={`mailto:${settings.contact_email}`}><small>EMAIL</small>{settings.contact_email}</a><a href={settings.contact_github}><small>GITHUB</small>{settings.contact_github.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a><a href={settings.contact_linkedin}><small>LINKEDIN</small>{settings.contact_linkedin.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a></div></div>
+  <div class="prose"><div class="eyebrow">/ contact</div><h1>Send a message.</h1><p>{settings.contact_intro}</p><div class="contacts"><a href={`mailto:${settings.contact_email}`}><small>EMAIL</small>{settings.contact_email}</a><a href={settings.contact_github} target="_blank" rel="noopener noreferrer"><small>GITHUB</small>{settings.contact_github.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a><a href={settings.contact_linkedin} target="_blank" rel="noopener noreferrer"><small>LINKEDIN</small>{settings.contact_linkedin.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a></div></div>
 </Layout>

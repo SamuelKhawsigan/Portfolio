@@ -3,17 +3,24 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import { getGalleryPhotos, getSiteSettings } from '../lib/site-content';
 const [settings, gallery] = await Promise.all([getSiteSettings(), getGalleryPhotos()]);
-const photos = gallery;
+const events = [...gallery.reduce((collection, photo) => {
+  const slug = photo.event_slug || photo.slug;
+  const current = collection.get(slug);
+  if (current) {
+    current.photos.push(photo);
+    if (!current.linkedin_url && photo.linkedin_url) current.linkedin_url = photo.linkedin_url;
+  } else {
+    collection.set(slug, { ...photo, event_slug: slug, photos: [photo] });
+  }
+  return collection;
+}, new Map<string, (typeof gallery)[number] & { event_slug: string; photos: typeof gallery }>()).values()];
 ---
 <Layout title="Events" description="Workshops, industry visits and community events attended by Samuel Khawsigan.">
   <div class="page-head"><div><p class="edition-label">Out of the lab</p><h1>Events</h1><p class="page-lede">{settings.events_intro}</p></div><a class="text-command" href="/gallery/">Full gallery ↗</a></div>
   <div class="event-list">
-    {photos.map((photo, index) => (
-      <article class="event-item">
-        <a href={`/gallery/#${photo.slug}`} aria-labelledby={`event-title-${index}`} aria-describedby={`event-summary-${index}`}>
-          <img src={photo.src} alt={photo.alt} width={photo.width ?? undefined} height={photo.height ?? undefined} loading="lazy" decoding="async" />
-          <div class="event-copy"><span class="event-number">0{index + 1} / 0{photos.length}</span><h2 id={`event-title-${index}`}>{photo.title}</h2><p id={`event-summary-${index}`}>{photo.summary}</p><span class="event-open">View in gallery ↗</span></div>
-        </a>
+    {events.map((event, index) => (
+      <article id={`event-${event.event_slug}`} class="event-item">
+        {event.linkedin_url ? <a href={event.linkedin_url} target="_blank" rel="noopener noreferrer" aria-labelledby={`event-title-${index}`} aria-describedby={`event-summary-${index}`}><img src={event.src} alt={event.alt} width={event.width ?? undefined} height={event.height ?? undefined} loading="lazy" decoding="async" /><div class="event-copy"><span class="event-number">0{index + 1} / 0{events.length}</span><h2 id={`event-title-${index}`}>{event.title}</h2><p id={`event-summary-${index}`}>{event.summary}</p><span class="event-photo-count">{event.photos.length} {event.photos.length === 1 ? 'photo' : 'photos'} in gallery</span><span class="event-open">Read on LinkedIn ↗</span></div></a> : <div class="event-static"><img src={event.src} alt={event.alt} width={event.width ?? undefined} height={event.height ?? undefined} loading="lazy" decoding="async" /><div class="event-copy"><span class="event-number">0{index + 1} / 0{events.length}</span><h2 id={`event-title-${index}`}>{event.title}</h2><p id={`event-summary-${index}`}>{event.summary}</p><span class="event-photo-count">{event.photos.length} {event.photos.length === 1 ? 'photo' : 'photos'} in gallery</span><span class="event-unlinked">LinkedIn post not linked yet</span></div></div>}
       </article>
     ))}
   </div>
@@ -21,8 +28,8 @@ const photos = gallery;
 <style>
   .page-lede { color: var(--muted); max-width: 40ch; margin: .8rem 0 0; }
   .event-item { margin: 0 0 clamp(4rem, 8vw, 7rem); }
-  .event-item a { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr); gap: clamp(1.5rem, 5vw, 5rem); align-items: center; color: inherit; text-decoration: none; }
-  .event-item:nth-child(even) a { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
+  .event-item a,.event-static { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr); gap: clamp(1.5rem, 5vw, 5rem); align-items: center; color: inherit; text-decoration: none; }
+  .event-item:nth-child(even) a,.event-item:nth-child(even) .event-static { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
   .event-item:nth-child(even) img { order: 2; }
   .event-item img { display: block; width: 100%; height: clamp(280px, 40vw, 510px); object-fit: cover; object-position: center 30%; transition: transform 240ms ease, filter 240ms ease; }
   .event-item a:hover img, .event-item a:focus-visible img { transform: translateY(-3px); filter: saturate(1.08); }
@@ -31,6 +38,8 @@ const photos = gallery;
   .event-copy h2 { font: 600 clamp(2rem, 4vw, 3.4rem)/1.05 var(--sans); letter-spacing: -.045em; margin: 1.5rem 0 1rem; }
   .event-copy p { color: var(--muted); max-width: 35ch; }
   .event-open { display: inline-flex; align-items: center; min-height: 44px; padding: .65rem 1rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; margin-top: 1.5rem; transition: background-color 180ms ease, color 180ms ease; }
+  .event-unlinked{display:inline-flex;margin-top:1.5rem;color:var(--muted);font:.78rem var(--mono)}
+  .event-photo-count{display:block;margin-top:1rem;color:var(--muted);font:.72rem var(--mono);letter-spacing:.04em;text-transform:uppercase}
   .event-item a:hover .event-open, .event-item a:focus-visible .event-open { color: var(--paper-ink); background: var(--accent-hover); border-color: var(--accent-hover); }
   @media (prefers-reduced-motion: no-preference) {
     .event-item:first-child, .event-item:first-child .event-copy { animation: event-enter 600ms both; }
@@ -44,7 +53,7 @@ const photos = gallery;
     .event-item img, .event-open { transition: none; }
   }
   @media (max-width: 680px) {
-    .event-item a, .event-item:nth-child(even) a { grid-template-columns: 1fr; gap: 1.2rem; }
+    .event-item a, .event-item:nth-child(even) a,.event-static,.event-item:nth-child(even) .event-static { grid-template-columns: 1fr; gap: 1.2rem; }
     .event-item:nth-child(even) img { order: 0; }
     .event-item img { height: 300px; }
     .event-copy h2 { margin-top: 1rem; }

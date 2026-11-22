@@ -1,19 +1,46 @@
 ---
 export const prerender = false;
 import Layout from '../layouts/Layout.astro';
-import { getGalleryPhotos } from '../lib/site-content';
-const photos = await getGalleryPhotos();
+import { getGalleryPhotos, getSiteSettings } from '../lib/site-content';
+const [photos, settings] = await Promise.all([getGalleryPhotos(), getSiteSettings()]);
+const scrollDuration = Math.max(120, Math.min(1600, Number(settings.gallery_scroll_duration) || 420));
 ---
 <Layout title="Gallery" description="Photos from Samuel Khawsigan’s events and visits.">
   <div class="page-head"><h1>Gallery</h1><a class="text-command" href="/events/">Events ↗</a></div>
-  {photos.length ? <div class="event-photo-grid">
-    {photos.map((photo) => (
-      <figure id={photo.slug}>
-        <a href={photo.src} aria-label={`Open full photo: ${photo.title}`}>
+  {photos.length ? <><div class="gallery-rail-controls" aria-label="Gallery controls"><span><b aria-hidden="true">←</b> <kbd>←</kbd> <kbd>→</kbd> to browse</span><div><button type="button" data-rail-prev aria-label="Scroll gallery left">←</button><button type="button" data-rail-next aria-label="Scroll gallery right">→</button></div></div><div class="gallery-stream" data-gallery-stream data-scroll-duration={scrollDuration}>
+    {photos.map((photo, index) => (
+      <figure id={photo.slug} class="gallery-item">
+        <button class="gallery-open" type="button" data-gallery-open data-src={photo.src} data-alt={photo.alt} data-title={photo.title} data-summary={photo.summary} data-event-href={`/events/#event-${encodeURIComponent(photo.event_slug || photo.slug)}`} data-event-title={photo.title} aria-label={`Open full photo: ${photo.title}`}>
           <img src={photo.src} alt={photo.alt} width={photo.width ?? undefined} height={photo.height ?? undefined} loading="lazy" decoding="async" />
-        </a>
-        <figcaption>{photo.title}</figcaption>
+          <span class="gallery-open-label">View photo <b aria-hidden="true">↗</b></span>
+        </button>
+        <figcaption><span>{String(index + 1).padStart(2, '0')} / {photo.title}</span>{photo.summary && <small>{photo.summary}</small>}</figcaption>
       </figure>
     ))}
-  </div> : <p>No gallery photos published yet.</p>}
+  </div></> : <p>No gallery photos published yet.</p>}
+  <dialog class="gallery-dialog" data-gallery-dialog aria-labelledby="gallery-dialog-title"><form method="dialog"><button class="gallery-close" type="submit" aria-label="Close photo viewer">×</button></form><div class="gallery-dialog-media"><img data-dialog-image src="" alt=""/><div class="gallery-dialog-nav"><button type="button" data-gallery-prev aria-label="Previous photo">←</button><button type="button" data-gallery-next aria-label="Next photo">→</button></div></div><div class="gallery-dialog-copy"><div><p data-dialog-index class="gallery-dialog-index">Gallery</p><h2 id="gallery-dialog-title" data-dialog-title></h2><p data-dialog-summary></p></div><a class="editorial-link" data-dialog-event>Read related event <span aria-hidden="true">→</span></a></div></dialog>
 </Layout>
+<style>
+  .gallery-rail-controls{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:1.5rem;color:var(--muted);font:.76rem var(--mono)}.gallery-rail-controls span{display:flex;align-items:center;gap:.35rem}.gallery-rail-controls b{color:var(--accent);font-size:1.1rem}.gallery-rail-controls kbd{padding:.08rem .35rem;border:1px solid var(--line);border-radius:3px;background:var(--pane);color:var(--ink);font:inherit}.gallery-rail-controls div{display:flex;gap:.45rem}.gallery-rail-controls button{display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--line);border-radius:999px;background:var(--pane);color:var(--ink);font-size:1rem;cursor:pointer}.gallery-rail-controls button:hover,.gallery-rail-controls button:focus-visible{border-color:var(--accent);background:var(--accent);color:var(--paper-ink)}.gallery-stream{display:flex;gap:1rem;overflow-x:auto;margin:1rem calc(50% - 50vw) 0;padding:0 max(1rem,calc((100vw - min(1680px,92vw))/2)) .7rem;scroll-snap-type:x mandatory;scroll-padding-left:max(1rem,calc((100vw - min(1680px,92vw))/2));scrollbar-width:thin;scrollbar-color:#46677c #0c1822}.gallery-stream::-webkit-scrollbar{height:8px}.gallery-stream::-webkit-scrollbar-track{background:#0c1822}.gallery-stream::-webkit-scrollbar-thumb{background:#46677c;border-radius:999px}.gallery-item{flex:0 0 clamp(230px,29vw,470px);margin:0;scroll-snap-align:start;scroll-snap-stop:always}.gallery-open{position:relative;display:block;width:100%;padding:0;border:0;background:#0b151d;cursor:zoom-in;overflow:hidden}.gallery-open img{display:block;width:100%;aspect-ratio:16/10;max-height:52vh;object-fit:cover;transition:transform 260ms ease,filter 260ms ease}.gallery-open:hover img,.gallery-open:focus-visible img{transform:scale(1.025);filter:brightness(.82)}.gallery-open:focus-visible{outline:3px solid var(--accent);outline-offset:5px}.gallery-open-label{position:absolute;right:.8rem;bottom:.8rem;display:inline-flex;gap:.4rem;align-items:center;padding:.4rem .7rem;border:1px solid var(--accent);border-radius:999px;background:#0a1825e8;color:#e8f4f8;font:.75rem var(--mono);opacity:0;transform:translateY(5px);transition:opacity 180ms ease,transform 180ms ease}.gallery-open:hover .gallery-open-label,.gallery-open:focus-visible .gallery-open-label{opacity:1;transform:translateY(0)}.gallery-item figcaption{display:grid;gap:.25rem;padding-top:.55rem;color:var(--ink);font:600 .92rem var(--sans)}.gallery-item figcaption small{color:var(--muted);font:400 .82rem/1.35 var(--sans)}.gallery-dialog{width:min(1100px,calc(100vw - 2rem));max-height:calc(100vh - 2rem);padding:0;border:1px solid var(--line);border-radius:12px;background:#0a1825;color:var(--ink);box-shadow:0 24px 60px #00000080}.gallery-dialog::backdrop{background:#02070bd9;backdrop-filter:blur(4px)}.gallery-close{position:absolute;z-index:2;top:.8rem;right:.8rem;display:grid;place-items:center;width:42px;height:42px;border:1px solid #5b7789;border-radius:999px;background:#0a1825;color:#eff9fc;font-size:1.5rem;cursor:pointer}.gallery-close:hover,.gallery-close:focus-visible,.gallery-dialog-nav button:hover,.gallery-dialog-nav button:focus-visible{border-color:var(--accent);background:var(--accent);color:var(--paper-ink)}.gallery-dialog-media{position:relative;display:grid;place-items:center;min-height:min(60vh,650px);background:#050b11}.gallery-dialog-media img{display:block;max-width:100%;max-height:min(60vh,650px);object-fit:contain}.gallery-dialog-nav{position:absolute;inset:auto 1rem 1rem;display:flex;justify-content:space-between;pointer-events:none}.gallery-dialog-nav button{pointer-events:auto;display:grid;place-items:center;width:42px;height:42px;border:1px solid #5b7789;border-radius:999px;background:#0a1825e8;color:#eff9fc;font-size:1.15rem;cursor:pointer}.gallery-dialog-copy{display:flex;align-items:end;justify-content:space-between;gap:1.5rem;padding:1.2rem 1.4rem}.gallery-dialog-copy h2{margin:.25rem 0;font-size:clamp(1.3rem,3vw,2rem)}.gallery-dialog-copy p:not(.gallery-dialog-index){max-width:60ch;margin:0;color:var(--muted)}.gallery-dialog-index{margin:0;color:var(--accent);font:.72rem var(--mono);letter-spacing:.08em;text-transform:uppercase}@media(max-width:700px){.gallery-rail-controls{margin-top:1rem}.gallery-rail-controls span{font-size:.68rem}.gallery-stream{gap:.8rem}.gallery-item{flex-basis:76vw}.gallery-open-label{opacity:1;transform:none}.gallery-dialog-copy{align-items:flex-start;flex-direction:column}.gallery-dialog .editorial-link{width:100%}}
+</style>
+<script>
+  const dialog = document.querySelector<HTMLDialogElement>('[data-gallery-dialog]');
+  const image = document.querySelector<HTMLImageElement>('[data-dialog-image]');
+  const title = document.querySelector<HTMLElement>('[data-dialog-title]');
+  const summary = document.querySelector<HTMLElement>('[data-dialog-summary]');
+  const eventLink = document.querySelector<HTMLAnchorElement>('[data-dialog-event]');
+  const index = document.querySelector<HTMLElement>('[data-dialog-index]');
+  const items = [...document.querySelectorAll<HTMLButtonElement>('[data-gallery-open]')];
+  const rail = document.querySelector<HTMLElement>('[data-gallery-stream]');
+  const duration = Math.max(120, Number(rail?.dataset.scrollDuration) || 420);
+  let active = 0;
+  const scrollRail = (direction: number) => { if (!rail) return; const start = rail.scrollLeft; const distance = Math.min(rail.clientWidth * .78, 520) * direction; const started = performance.now(); const tick = (now: number) => { const progress = Math.min(1, (now - started) / duration); const eased = 1 - Math.pow(1 - progress, 3); rail.scrollLeft = start + distance * eased; if (progress < 1) requestAnimationFrame(tick); }; requestAnimationFrame(tick); };
+  const show = (position: number, open = false) => { const button = items[position]; if (!dialog || !image || !title || !summary || !eventLink || !index || !button) return; active = (position + items.length) % items.length; const item = items[active]; image.src = item.dataset.src ?? ''; image.alt = item.dataset.alt ?? ''; title.textContent = item.dataset.title ?? ''; summary.textContent = item.dataset.summary ?? ''; index.textContent = `Gallery / ${String(active + 1).padStart(2, '0')}`; const href = item.dataset.eventHref; eventLink.hidden = !href; if (href) { eventLink.href = href; eventLink.firstChild!.textContent = item.dataset.eventTitle ? `Event: ${item.dataset.eventTitle} ` : 'Read related event '; } item.closest('.gallery-item')?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); if (open && !dialog.open) dialog.showModal(); };
+  items.forEach((button, position) => button.addEventListener('click', () => show(position, true)));
+  document.querySelector<HTMLButtonElement>('[data-gallery-prev]')?.addEventListener('click', () => show(active - 1));
+  document.querySelector<HTMLButtonElement>('[data-gallery-next]')?.addEventListener('click', () => show(active + 1));
+  document.querySelector<HTMLButtonElement>('[data-rail-prev]')?.addEventListener('click', () => scrollRail(-1));
+  document.querySelector<HTMLButtonElement>('[data-rail-next]')?.addEventListener('click', () => scrollRail(1));
+  window.addEventListener('keydown', (event) => { if (dialog?.open || event.metaKey || event.ctrlKey || event.altKey || document.activeElement?.matches('input,textarea,select,button')) return; if (event.key === 'ArrowLeft') { event.preventDefault(); scrollRail(-1); } if (event.key === 'ArrowRight') { event.preventDefault(); scrollRail(1); } });
+  dialog?.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+</script>

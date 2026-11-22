@@ -29,7 +29,7 @@ const safeExternal = (value: string | null) => {
       {managed.description && <p>{managed.description}</p>}
       {managed.cover_image && <figure><img src={publicImageUrl(managed.cover_image) ?? undefined} alt={managed.cover_alt ?? ''} loading="lazy" decoding="async"/></figure>}
       {sections.map(section => section.html && <section><h2>{section.heading}</h2><div set:html={section.html}/></section>)}
-      {(safeExternal(managed.repo_url) || safeExternal(managed.live_url)) && <p class="project-links">{safeExternal(managed.repo_url) && <a class="editorial-link" href={safeExternal(managed.repo_url) ?? undefined}>Source ↗</a>}{safeExternal(managed.live_url) && <a class="editorial-link" href={safeExternal(managed.live_url) ?? undefined}>Live site ↗</a>}</p>}
+      {(safeExternal(managed.repo_url) || safeExternal(managed.live_url)) && <p class="project-links">{safeExternal(managed.repo_url) && <a class="editorial-link" href={safeExternal(managed.repo_url) ?? undefined} target="_blank" rel="noopener noreferrer">Source ↗</a>}{safeExternal(managed.live_url) && <a class="editorial-link" href={safeExternal(managed.live_url) ?? undefined} target="_blank" rel="noopener noreferrer">Live site ↗</a>}</p>}
     </> : entry && Content ? <><div class="eyebrow" style="margin-top:2.2rem">{entry.data.placeholder?'[PLACEHOLDER] / unpublished work':'project notes'}</div><h1>{entry.data.title}</h1><Content/></> : <h1>Project not found</h1>}
   </article>
 </Layout>

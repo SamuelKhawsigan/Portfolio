@@ -15,13 +15,36 @@ const active = (url: string) => url === '/' ? path === '/' : path === url.slice(
 ---
 <!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>{title} | Samuel Khawsigan</title><meta name="description" content={description}/>{(title.includes("[PLACEHOLDER]")||title==="404") && <meta name="robots" content="noindex, follow"/>}<meta name="theme-color" content="#101e2a"/><link rel="icon" type="image/svg+xml" href="/favicon.svg"/><link rel="alternate" type="application/rss+xml" title="Samuel Khawsigan’s blog" href="/rss.xml"/>{origin && <link rel="canonical" href={new URL(path, origin)}/>}
 <meta property="og:title" content={`${title} | Samuel Khawsigan`}/><meta property="og:description" content={description}/><meta property="og:type" content="website"/>{origin && <><meta property="og:url" content={new URL(path,origin)}/><meta property="og:image" content={new URL('/og.png', origin)}/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta property="og:image:alt" content="Samuel Khawsigan, cybersecurity portfolio"/><meta name="twitter:image" content={new URL('/og.png',origin)}/></>}<meta name="twitter:title" content={`${title} | Samuel Khawsigan`}/><meta name="twitter:description" content={description}/><meta name="twitter:card" content="summary_large_image"/></head>
-<body><a class="skip" href="#main">Skip to content</a><div class="shell"><header class="site-header"><div class="header-top"><a class="site-name" href="/" aria-label="Samuel Khawsigan, home">Samuel Khawsigan</a><span class="site-context">Cybersecurity / Kuala Lumpur</span></div><nav aria-label="Main navigation">{nav.map(([url,label],index) => <a href={url} aria-current={active(url)?'page':undefined}><span class="nav-num" aria-hidden="true">{String(index+1).padStart(2,'0')}</span><span>{label}</span></a>)}</nav></header>
+<body><a class="skip" href="#main">Skip to content</a><div class="shell"><header class="site-header"><div class="header-top"><a class="site-name" href="/" aria-label="Samuel Khawsigan, home">Samuel Khawsigan</a><div class="header-tools"><button class="header-tool theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Switch to light theme"><span aria-hidden="true">◐</span><span data-theme-label>Light mode</span></button><button class="header-tool search-toggle" type="button" data-search-toggle aria-expanded="false" aria-controls="site-post-search"><span aria-hidden="true">⌕</span><span>Search posts</span></button></div></div><nav aria-label="Main navigation">{nav.map(([url,label],index) => <a href={url} aria-current={active(url)?'page':undefined}><span class="nav-num" aria-hidden="true">{String(index+1).padStart(2,'0')}</span><span>{label}</span></a>)}</nav><div class="site-post-search" id="site-post-search" data-search-panel hidden><form action="/blog/" method="get" role="search"><label for="site-post-query">Search blog posts</label><div><input id="site-post-query" name="q" type="search" placeholder="Search notes, projects, or topics" autocomplete="off"/><button type="submit">Search <span aria-hidden="true">→</span></button></div></form></div></header>
 <main id="main" tabindex="-1"><slot/></main>
 <footer class="site-footer">
+  <div class="footer-topline"><a class="footer-brand" href="/">Samuel Khawsigan</a><p>{settings.footer_intro}</p></div>
   <div class="footer-main">
-    <div class="footer-intro"><span class="footer-kicker">END OF PAGE / STAY IN TOUCH</span><h2>{settings.footer_heading}</h2><p>{settings.footer_intro}</p></div>
-    <div class="footer-group"><h3>Find me</h3><div class="footer-actions"><a href={`mailto:${settings.contact_email}`}>Email <span aria-hidden="true">↗</span></a><a href={settings.contact_github} rel="me">GitHub <span aria-hidden="true">↗</span></a><a href={settings.contact_linkedin} rel="me">LinkedIn <span aria-hidden="true">↗</span></a><a href="/rss.xml" type="application/rss+xml">RSS feed <span aria-hidden="true">↗</span></a></div></div>
+    <div class="footer-group"><h3>Explore</h3><div class="footer-link-list"><a href="/profile/">Profile</a><a href="/projects/">Projects</a><a href="/gallery/">Gallery</a><a href="/blog/">Blog</a></div></div>
+    <div class="footer-group"><h3>Elsewhere</h3><div class="footer-link-list"><a href="/uses/">Uses</a><a href="/contact/">Contact</a><a href="/rss.xml" type="application/rss+xml">RSS feed</a></div></div>
+    <div class="footer-group footer-contact"><h3>Contact</h3><a href={`mailto:${settings.contact_email}`}>{settings.contact_email}</a><div class="footer-actions footer-socials"><a href={settings.contact_github} target="_blank" rel="me noopener noreferrer" aria-label="Samuel on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.18-3.37-1.18-.45-1.15-1.1-1.45-1.1-1.45-.9-.62.07-.6.07-.6 1 .07 1.52 1.03 1.52 1.03.89 1.52 2.33 1.08 2.9.83.09-.64.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.8c.85 0 1.7.11 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.9.68 1.82v2.7c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg><span>GitHub</span></a><a href={settings.contact_linkedin} target="_blank" rel="me noopener noreferrer" aria-label="Samuel on LinkedIn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 3.5a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2ZM3.7 8.1h2.8v12.4H3.7V8.1Zm4.6 0H11v1.7h.04c.38-.72 1.3-2 2.88-2 3.08 0 3.65 2.03 3.65 4.67v8.05h-2.82v-7.14c0-1.7-.03-3.89-2.37-3.89-2.38 0-2.74 1.85-2.74 3.77v7.26H6.82V8.1Z"/></svg><span>LinkedIn</span></a><a href={`mailto:${settings.contact_email}`} aria-label="Email Samuel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5h18v13H3v-13Zm2 2v.32l7 4.67 7-4.67V7.5l-7 4.67-7-4.67Z"/></svg><span>Email</span></a><a href="/rss.xml" type="application/rss+xml" aria-label="RSS feed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm-2 7v3c4.14 0 7.5 3.36 7.5 7.5h3A10.5 10.5 0 0 0 3 10.5Zm0-6v3C10.77 7.5 17.5 14.23 17.5 22h3C20.5 12.57 12.93 5 3 4.5Z"/></svg><span>RSS</span></a></div></div>
   </div>
-  <div class="footer-bottom"><span>© {new Date().getFullYear()} Samuel Khawsigan</span><span>Kuala Lumpur, Malaysia</span><div><a href="/uses/">Uses</a><a href="/contact/">Contact</a><a href="#main">Back to top ↑</a></div></div>
-</footer></div></body></html>
+  <div class="footer-bottom"><span>© {new Date().getFullYear()} Samuel Khawsigan</span><span>Kuala Lumpur, Malaysia</span><div><a href="#main">Back to top ↑</a></div></div>
+</footer></div><script>
+  const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (!motionQuery.matches) {
+    document.documentElement.classList.add('motion-ready');
+    const revealTargets = [...document.querySelectorAll('main > *, .site-footer, .site-header')];
+    revealTargets.forEach((target, index) => {
+      target.classList.add('reveal');
+      target.style.setProperty('--reveal-delay', `${Math.min(index, 6) * 55}ms`);
+    });
+    const observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
+      if (entry.isIntersecting) { entry.target.classList.add('is-visible'); observer.unobserve(entry.target); }
+    }), { threshold: .12, rootMargin: '0px 0px -6% 0px' });
+    revealTargets.forEach((target) => observer.observe(target));
+    let ticking = false;
+    const updateParallax = () => {
+      document.documentElement.style.setProperty('--scroll-offset', `${Math.min(window.scrollY, 1200)}px`);
+      ticking = false;
+    };
+    window.addEventListener('scroll', () => { if (!ticking) { requestAnimationFrame(updateParallax); ticking = true; } }, { passive: true });
+    updateParallax();
+  }
+</script><script is:inline src="/scripts/site-controls.js"></script></body></html>
 
