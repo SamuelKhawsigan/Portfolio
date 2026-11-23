@@ -2,18 +2,9 @@
 export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import { getGalleryPhotos, getSiteSettings } from '../lib/site-content';
+import { getEventCovers, groupEventPhotos } from '../lib/gallery-events';
 const [settings, gallery] = await Promise.all([getSiteSettings(), getGalleryPhotos()]);
-const events = [...gallery.reduce((collection, photo) => {
-  const slug = photo.event_slug || photo.slug;
-  const current = collection.get(slug);
-  if (current) {
-    current.photos.push(photo);
-    if (!current.linkedin_url && photo.linkedin_url) current.linkedin_url = photo.linkedin_url;
-  } else {
-    collection.set(slug, { ...photo, event_slug: slug, photos: [photo] });
-  }
-  return collection;
-}, new Map<string, (typeof gallery)[number] & { event_slug: string; photos: typeof gallery }>()).values()];
+const events = groupEventPhotos(gallery, await getEventCovers());
 ---
 <Layout title="Events" description="Workshops, industry visits and community events attended by Samuel Khawsigan.">
   <div class="page-head"><div><p class="edition-label">Out of the lab</p><h1>Events</h1><p class="page-lede">{settings.events_intro}</p></div><a class="text-command" href="/gallery/">Full gallery ↗</a></div>

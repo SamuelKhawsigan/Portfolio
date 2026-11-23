@@ -2,16 +2,64 @@
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { getAdminClient } from '../../../lib/auth';
+import { eventCoverKey } from '../../../lib/gallery-events';
 
 const supabase = await getAdminClient(Astro);
 if (!supabase) return Astro.redirect('/admin/login/');
+let actionError = '';
+if (Astro.request.method === 'POST') {
+  if (Astro.request.headers.get('origin') !== Astro.url.origin) return new Response('Forbidden', { status: 403 });
+  const form = await Astro.request.formData();
+  const eventId = String(form.get('event_id') ?? '');
+  const photoId = String(form.get('photo_id') ?? '');
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(eventId) || eventId.length > 100 || !/^[a-f0-9-]{36}$/i.test(photoId)) {
+    actionError = 'Choose a valid event photo.';
+  } else {
+    const { data: photo } = await supabase.from('gallery_items').select('id,event_slug,slug,status').eq('id', photoId).maybeSingle();
+    if (!photo || (photo.event_slug || photo.slug) !== eventId || photo.status !== 'published') {
+      actionError = 'Publish the photo before making it the main event photo.';
+    } else {
+      const saved = await supabase.from('site_settings').upsert({ key: eventCoverKey(eventId), value: photoId, updated_at: new Date().toISOString() }).select('key').maybeSingle();
+      if (saved.data) return Astro.redirect('/admin/gallery/?saved=1', 303);
+      actionError = 'Couldn’t save the main photo. Please try again.';
+    }
+  }
+  Astro.response.status = 400;
+}
 const { data: photos, error } = await supabase.from('gallery_items')
-  .select('id,slug,title,summary,image_path,status,display_order')
-  .order('display_order', { ascending: true });
-const imageUrl = (path: string) => path.startsWith('/') ? path
-  : supabase.storage.from('portfolio-gallery').getPublicUrl(path).data.publicUrl;
+  .select('id,slug,title,summary,image_path,status,display_order,event_slug')
+  .order('display_order', { ascending: true }).order('id');
+const { data: coverRows } = await supabase.from('site_settings').select('key,value').like('key', 'gallery_event_cover:%');
+const covers = Object.fromEntries((coverRows ?? []).map(row => [row.key, row.value]));
+const groups = new Map<string, NonNullable<typeof photos>>();
+for (const photo of photos ?? []) {
+  const eventId = photo.event_slug || photo.slug;
+  const group = groups.get(eventId) ?? [];
+  group.push(photo);
+  groups.set(eventId, group);
+}
+const imageUrl = (path: string) => path.startsWith('/') ? path : supabase.storage.from('portfolio-gallery').getPublicUrl(path).data.publicUrl;
 ---
 <AdminLayout title="Gallery">
-  <div class="editor-page"><header class="admin-page-header"><div><p class="admin-page-eyebrow">Content / Gallery</p><h1>Gallery</h1><p class="admin-page-subtitle">These photos also appear on Events. Change order on each photo and keep drafts hidden until they are ready.</p></div><a href="/admin/gallery/new/" class="action-button">+ Add photo</a></header>
-  {error ? <p class="msg msg-err" role="alert">Couldn’t load the gallery. Apply migration 003 and check permissions.</p> : photos?.length ? <div class="media-grid">{photos.map(photo => <article class="media-card"><figure class="media-card-figure"><img src={imageUrl(photo.image_path)} alt="" loading="lazy"/></figure><div class="media-card-body"><h2>{photo.title}</h2><div class="media-card-meta"><span class="meta-pill">Order {photo.display_order}</span><span class={`status-pill status-pill--${photo.status}`}>{photo.status}</span></div><div class="media-card-footer"><span class="content-card-meta">/{photo.slug}</span><a class="secondary-button" href={`/admin/gallery/${photo.id}/`}>Edit <span aria-hidden="true">→</span></a></div></div></article>)}</div> : <p class="help">No photos yet. Add one to start the gallery.</p>}</div>
+  <div class="editor-page">
+    <header class="admin-page-header"><div><p class="admin-page-eyebrow">Content / Gallery</p><h1>Event galleries</h1><p class="admin-page-subtitle">Each event has one main photo on Events. All published photos appear in Gallery. Add photos to an event below, then choose its main image.</p></div><a href="/admin/gallery/new/" class="action-button">+ Add photo / event</a></header>
+    {actionError && <p class="msg msg-err" role="alert">{actionError}</p>}
+    {error ? <p class="msg msg-err" role="alert">Couldn’t load the gallery. Please try again.</p> : [...groups].map(([eventId, images]) => {
+      const published = images.filter(photo => photo.status === 'published');
+      const main = published.find(photo => photo.id === covers[eventCoverKey(eventId)]) ?? published[0];
+      return <section class="event-album" aria-labelledby={`album-${eventId}`}>
+        <header class="album-heading"><div><h2 id={`album-${eventId}`}>{main?.title ?? images[0].title}</h2><p>{images.length} photos · {published.length} published <span>Event ID: {eventId}</span></p></div><div class="album-actions"><a class="secondary-button" href={`/admin/gallery/new/?event=${encodeURIComponent(eventId)}`}>+ Add photo to event</a>{main && <a class="secondary-button" href={`/events/#event-${eventId}`}>View event ↗</a>}</div></header>
+        <div class="album-grid">{images.map(photo => <article class="media-card">
+          <figure class="album-photo"><img src={imageUrl(photo.image_path)} alt={photo.title} loading="lazy"/></figure>
+          <div class="media-card-body"><h3>{photo.title}</h3><div class="media-card-meta"><span class={`status-pill status-pill--${photo.status}`}>{photo.status}</span>{main?.id === photo.id && <span class="main-badge">Main event photo</span>}</div>
+            <div class="album-card-actions"><a class="secondary-button" href={`/admin/gallery/${photo.id}/`}>Edit photo</a>{photo.status === 'published' && main?.id !== photo.id && <form method="POST"><input type="hidden" name="event_id" value={eventId}/><input type="hidden" name="photo_id" value={photo.id}/><button class="secondary-button" type="submit">Set as main photo</button></form>}</div>
+          </div>
+        </article>)}</div>
+      </section>;
+    })}
+    {!error && !photos?.length && <p class="help">No photos yet. Add a photo to create your first event gallery.</p>}
+  </div>
 </AdminLayout>
+<style>
+.event-album{margin:2rem 0 3rem;padding:1.25rem;border:1px solid var(--line);border-radius:12px;background:#0f172a44}.album-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.25rem;padding:0}.album-heading h2{margin:0;font:600 1.25rem var(--sans)}.album-heading p{margin:.5rem 0 0;color:var(--muted);font-size:.85rem}.album-heading p span{display:block;margin-top:.25rem;font:.7rem var(--mono)}.album-actions,.album-card-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}.album-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));gap:1rem}.album-photo{margin:0;height:200px;background:#080f18;border-bottom:1px solid var(--line)}.album-photo img{display:block;width:100%;height:100%;object-fit:contain}.media-card-body h3{font:600 .95rem var(--sans);margin:0}.main-badge{padding:.25rem .5rem;border:1px solid #38bdf866;border-radius:999px;color:var(--accent);font:.7rem var(--mono)}.album-card-actions{margin-top:auto}.album-card-actions .secondary-button{min-height:36px;padding:.4rem .75rem;font-size:.8rem}.album-card-actions form{margin:0}@media(max-width:700px){.album-heading{align-items:flex-start;flex-direction:column}.event-album{padding:.8rem}}
+</style>
