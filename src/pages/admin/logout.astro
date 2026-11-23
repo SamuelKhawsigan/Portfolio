@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import { createSupabaseClient } from '../../lib/supabase';
+import { adminAccessCookie } from '../../lib/auth';
 
 Astro.response.headers.set('Cache-Control', 'private, no-store');
 if (Astro.request.method === 'POST') {
@@ -9,6 +10,7 @@ if (Astro.request.method === 'POST') {
   }
   const supabase = createSupabaseClient(Astro.cookies, Astro.request.headers);
   await supabase?.auth.signOut();
+  Astro.cookies.delete(adminAccessCookie, { path: '/' });
 }
 return Astro.redirect('/admin/login/', 303);
 ---

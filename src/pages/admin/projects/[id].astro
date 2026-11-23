@@ -88,7 +88,7 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
       </aside></div>
       <div class="form-actions"><button class="btn btn-primary" type="submit">Save project</button>{!isNew && values.status === 'published' && <a class="btn" href={`/projects/${values.slug}/`}>View project ↗</a>}</div>
     </form>
-    {!isNew && <form class="delete-item-form" action="/admin/delete" method="POST"><input type="hidden" name="kind" value="project"/><input type="hidden" name="id" value={id}/><button class="btn btn-danger" type="submit" data-delete-item data-item-name={values.title}>Delete project</button></form>}
+    {!isNew && <form class="delete-item-form" action="/admin/delete" method="POST" data-delete-form data-item-name={values.title}><input type="hidden" name="kind" value="project"/><input type="hidden" name="id" value={id}/><button class="btn btn-danger" type="submit" data-delete-button>Delete project</button></form>}
   </> : <h1>{loaded?.error ? 'Couldn’t load project' : 'Project not found'}</h1>}</div>
 </AdminLayout>
 <style>.checkbox-label{display:flex!important;align-items:center;gap:.6rem;text-transform:none!important;font:1rem var(--sans)!important}.checkbox-label input{width:auto}.dropzone>span{font-size:1.5rem;color:var(--accent)}</style>
@@ -97,5 +97,4 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
   const preview = document.querySelector('[data-image-preview]');
   const label = document.querySelector('[data-upload-label]');
   file?.addEventListener('change', () => { const next = file.files?.[0]; if (!next) return; if (preview instanceof HTMLImageElement) preview.src = URL.createObjectURL(next); else { const img = document.createElement('img'); img.className = 'image-preview'; img.dataset.imagePreview = ''; img.src = URL.createObjectURL(next); img.alt = 'Selected project image preview'; file.closest('.form-sidebar')?.prepend(img); } if (label) label.textContent = `Replace ${next.name}`; });
-  document.querySelector<HTMLButtonElement>('[data-delete-item]')?.addEventListener('click', (event) => { if (!window.confirm(`Delete ${event.currentTarget.dataset.itemName || 'this project'}? This cannot be undone.`)) event.preventDefault(); });
 </script>

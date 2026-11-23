@@ -31,16 +31,35 @@ export const POST: APIRoute = async (context) => {
   const { data: item, error: readError } = await supabase.from(target.table).select('*').eq('id', id).maybeSingle();
   if (readError || !item) return context.redirect(`${target.path}?error=delete`, 303);
 
-  const { error: deleteError } = await supabase.from(target.table).delete().eq('id', id);
-  if (deleteError) return context.redirect(`${target.path}?error=delete`, 303);
+  // Request the deleted id back. Supabase can otherwise return a successful
+  // response even when row-level security prevents the delete from affecting a
+  // row, which made the CMS look as if an item had been removed when it had not.
+  const { data: deleted, error: deleteError } = await supabase
+    .from(target.table)
+    .delete()
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+  if (deleteError || !deleted) return context.redirect(`${target.path}?error=delete`, 303);
 
   const publicBase = supabase.storage.from('portfolio-gallery').getPublicUrl('').data.publicUrl;
-  const toStoragePath = (value: string | null | undefined) => value?.startsWith(publicBase)
-    ? decodeURIComponent(value.slice(publicBase.length).split('?')[0]) : null;
+  const toStoragePath = (value: string | null | undefined) => {
+    const source = value?.trim();
+    if (!source) return null;
+
+    // Images uploaded by the CMS are stored as object paths. Older content can
+    // contain their public URL instead, while hand-authored /images paths must
+    // never be sent to Supabase Storage for deletion.
+    if (source.startsWith(publicBase)) {
+      return decodeURIComponent(source.slice(publicBase.length).split('?')[0]);
+    }
+    if (/^https?:\/\//i.test(source) || source.startsWith('/')) return null;
+    return source;
+  };
   const candidates = kind === 'post'
     ? [...String(item.content_md ?? '').matchAll(imagePattern)].map(match => match[1])
     : [item.image_path ?? item.cover_image];
-  const paths = candidates.map(toStoragePath).filter((path): path is string => !!path);
+  const paths = [...new Set(candidates.map(toStoragePath).filter((path): path is string => !!path))];
   if (paths.length) await supabase.storage.from('portfolio-gallery').remove(paths);
 
   return context.redirect(`${target.path}?deleted=1`, 303);

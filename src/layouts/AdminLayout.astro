@@ -156,6 +156,7 @@ const deleted = Astro.url.searchParams.has('deleted');
     adminTargets.forEach((target) => adminObserver.observe(target));
   }
 </script>
+<script is:inline src="/scripts/admin-delete.js"></script>
 
 </body>
 </html>

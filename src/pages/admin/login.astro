@@ -1,18 +1,13 @@
 ---
 export const prerender = false;
 import { adminConfigured, createSupabaseClient, ownerId } from '../../lib/supabase';
+import { adminAccessCookie } from '../../lib/auth';
 import '@fontsource/source-sans-3/400.css';
 import '@fontsource/source-sans-3/600.css';
 import '@fontsource/jetbrains-mono/400.css';
 
 Astro.response.headers.set('Cache-Control', 'private, no-store');
 const supabase = adminConfigured ? createSupabaseClient(Astro.cookies, Astro.request.headers) : null;
-
-// Redirect authenticated owner away from login
-const user = (await supabase?.auth.getUser())?.data.user;
-if (user && ownerId && user.id === ownerId) {
-  return Astro.redirect('/admin/');
-}
 
 let error = supabase ? '' : 'The site editor isn’t configured yet.';
 if (!supabase) Astro.response.status = 503;
@@ -27,6 +22,12 @@ if (supabase && Astro.request.method === 'POST') {
     await supabase.auth.signOut();
     error = 'Access denied.';
   } else {
+    Astro.cookies.set(adminAccessCookie, '1', {
+      httpOnly: true,
+      secure: import.meta.env.PROD,
+      sameSite: 'lax',
+      path: '/',
+    });
     return Astro.redirect('/admin/', 303);
   }
 }
@@ -39,36 +40,34 @@ if (supabase && Astro.request.method === 'POST') {
   <title>Admin login</title>
   <meta name="robots" content="noindex, nofollow"/>
   <style>
-    :root{--bg:#101e2a;--pane:#1a2c3a;--ink:#f1f4f2;--muted:#c3d1d8;--accent:#88c6ea;--line:#456170;--danger:#f2a7a1;--mono:'JetBrains Mono',monospace;--sans:'Source Sans 3',sans-serif}
-    *{box-sizing:border-box}html{background:var(--bg);color-scheme:dark}
-    body{margin:0;color:var(--ink);font:1rem/1.5 var(--sans);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem}
-    .card{border:1px solid var(--line);background:var(--pane);padding:2rem;width:100%;max-width:390px}
-    h1{margin:0 0 1.5rem;font:600 1.5rem/1.2 var(--sans);color:var(--ink)}
-    .field{margin-bottom:1rem}
-    .field label{display:block;font:.72rem var(--mono);color:var(--muted);margin-bottom:.35rem;text-transform:uppercase}
-    input{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:.55rem .75rem;width:100%}
-    input:focus-visible{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:2px}
-    button{display:block;width:100%;min-height:44px;padding:.6rem;border:1px solid var(--accent);background:none;color:var(--accent);font:.85rem var(--mono);cursor:pointer;margin-top:1.25rem}
-    button:hover{background:var(--accent);color:#172c39}
-    button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-    .err{border-left:3px solid var(--danger);background:#f2a7a112;color:var(--danger);padding:.6rem .8rem;font-size:.85rem;margin-bottom:1rem}
+    :root{--bg:#080d04;--pane:#111a08;--ink:#f5fbdc;--muted:#a8b982;--accent:#b4ef43;--accent-deep:#34520e;--line:#2a4013;--danger:#ffaca7;--danger-bg:#3a1a18;--sans:'Source Sans 3',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace}
+    *{box-sizing:border-box}html{background:var(--bg);color-scheme:dark}body{margin:0;min-height:100vh;padding:1.5rem;background:radial-gradient(circle at 50% 0%,#17250a 0,transparent 38rem),var(--bg);color:var(--ink);font:1rem/1.5 var(--sans);display:grid;place-items:center}
+    .card{width:min(100%,630px);padding:3.75rem 3.75rem 3.5rem;border:1px solid var(--line);border-radius:3rem;background:linear-gradient(145deg,#131d09,#0f1707);box-shadow:0 24px 70px #0000003d;text-align:center}
+    .lock{display:grid;place-items:center;width:84px;height:84px;margin:0 auto 1.65rem;border-radius:24px;background:#2d480c;color:var(--accent)}.lock svg{width:38px;height:38px}
+    h1{margin:0;color:var(--ink);font:600 2.35rem/1.08 Georgia,'Times New Roman',serif;letter-spacing:-.025em}.lede{margin:.65rem 0 2.75rem;color:var(--muted);font-size:1.3rem}
+    .field{text-align:left;margin-bottom:1.55rem}.field label{display:block;margin:0 0 .5rem;color:#d9e8ae;font-size:1rem;font-weight:600}input{width:100%;min-height:76px;padding:0 1.25rem;border:1px solid var(--accent-deep);border-radius:1rem;background:#0c1206;color:var(--ink);font:1.25rem var(--sans);transition:border-color 160ms ease,box-shadow 160ms ease}input::placeholder{color:#879568}input:focus-visible{border-color:var(--accent);outline:0;box-shadow:0 0 0 3px #b4ef4330}
+    button{display:flex;align-items:center;justify-content:center;gap:.75rem;width:100%;min-height:74px;margin-top:2rem;padding:.8rem 1.25rem;border:1px solid var(--accent);border-radius:999px;background:var(--accent);color:#0b1204;font:600 1.25rem var(--sans);cursor:pointer;transition:transform 160ms ease,background-color 160ms ease,box-shadow 160ms ease}button::after{content:'→';font-size:1.8rem;line-height:0}button:hover{background:#c9f969;transform:translateY(-2px);box-shadow:0 10px 26px #b4ef4326}button:focus-visible{outline:3px solid #efffc6;outline-offset:3px}.err{margin:0 0 2.25rem;padding:1rem 1.25rem;border:1px solid #ffb2ac;border-radius:1rem;background:var(--danger-bg);color:#ffd1ce;text-align:left;font-size:1.05rem}.notice{margin:2.25rem 0 0;color:#c3d693;font-size:1.1rem;line-height:1.55}
+    @media(max-width:600px){body{padding:1rem}.card{padding:2.5rem 1.5rem;border-radius:2rem}h1{font-size:2rem}.lede{font-size:1.1rem;margin-bottom:2rem}input{min-height:62px;font-size:1.1rem}button{min-height:62px;font-size:1.1rem}}
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Samuel / Site editor</h1>
+    <div class="lock" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="2" fill="currentColor" stroke="none"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.2" fill="#203306" stroke="none"/></svg></div>
+    <h1>Admin access</h1>
+    <p class="lede">Sign in to manage your portfolio.</p>
     {error && <div class="err" role="alert">{error}</div>}
     {supabase && <form method="POST">
       <div class="field">
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" required autocomplete="email"/>
+        <label for="email">Email address</label>
+        <input id="email" name="email" type="email" required autocomplete="username" placeholder="Enter your email"/>
       </div>
       <div class="field">
         <label for="password">Password</label>
-        <input id="password" name="password" type="password" required autocomplete="current-password"/>
+        <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="Enter your password"/>
       </div>
       <button type="submit">Sign in</button>
     </form>}
+    <p class="notice">This is a private administration area.<br/>Unauthorized access is prohibited.</p>
   </div>
 </body>
 </html>

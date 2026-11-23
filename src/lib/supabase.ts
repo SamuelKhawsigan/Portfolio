@@ -17,6 +17,10 @@ export function createSupabaseClient(cookies: AstroCookies, headers: Headers) {
         for (const { name, value, options } of updates) {
           cookies.set(name, value, {
             ...options,
+            // Keep authentication scoped to the current browser session. The
+            // separate CMS access gate is set after a successful owner login.
+            maxAge: undefined,
+            expires: undefined,
             httpOnly: true,
             secure: import.meta.env.PROD,
             sameSite: 'lax',

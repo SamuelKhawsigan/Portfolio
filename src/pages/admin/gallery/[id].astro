@@ -97,7 +97,7 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
       </aside></div>
       <div class="form-actions"><button class="btn btn-primary" type="submit">Save photo</button>{!isNew && values.status === 'published' && <a class="btn" href={`/gallery/#${values.slug}`}>View in gallery ↗</a>}</div>
     </form>
-    {!isNew && <form class="delete-item-form" action="/admin/delete" method="POST"><input type="hidden" name="kind" value="gallery"/><input type="hidden" name="id" value={id}/><button class="btn btn-danger" type="submit" data-delete-item data-item-name={values.title}>Delete photo</button></form>}
+    {!isNew && <form class="delete-item-form" action="/admin/delete" method="POST" data-delete-form data-item-name={values.title}><input type="hidden" name="kind" value="gallery"/><input type="hidden" name="id" value={id}/><button class="btn btn-danger" type="submit" data-delete-button>Delete photo</button></form>}
   </> : <h1>{loaded?.error ? 'Couldn’t load photo' : 'Photo not found'}</h1>}</div>
 </AdminLayout>
 <style>details{border-top:1px solid var(--line);padding-top:1rem}summary{cursor:pointer;color:var(--accent)}details .field-grid{margin-top:1rem}.dropzone>span{font-size:1.5rem;color:var(--accent)}</style>
@@ -105,5 +105,4 @@ if (Astro.request.method === 'POST' && (isNew || existing)) {
   const file = document.querySelector('#photo') as HTMLInputElement | null;
   const label = document.querySelector('[data-upload-label]');
   file?.addEventListener('change', () => { const next = file.files?.[0]; if (!next) return; const preview = document.querySelector('[data-image-preview]') as HTMLImageElement | null; if (preview) preview.src = URL.createObjectURL(next); else { const img = document.createElement('img'); img.className = 'image-preview'; img.dataset.imagePreview = ''; img.src = URL.createObjectURL(next); img.alt = 'Selected gallery photo preview'; file.closest('.form-sidebar')?.prepend(img); } if (label) label.textContent = `Replace ${next.name}`; });
-  document.querySelector<HTMLButtonElement>('[data-delete-item]')?.addEventListener('click', (event) => { if (!window.confirm(`Delete ${event.currentTarget.dataset.itemName || 'this photo'}? This cannot be undone.`)) event.preventDefault(); });
 </script>
