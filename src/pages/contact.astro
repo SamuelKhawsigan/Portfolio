@@ -3,7 +3,56 @@ export const prerender = false;
 import Layout from '../layouts/Layout.astro';
 import { getSiteSettings } from '../lib/site-content';
 const settings = await getSiteSettings();
+const githubLabel = settings.contact_github.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+const linkedinLabel = settings.contact_linkedin.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+const pgpFingerprint = '0x4A9F...E21C';
 ---
-<Layout title="Contact" description="Contact Samuel Khawsigan by email, GitHub, or LinkedIn.">
-  <div class="prose"><div class="eyebrow">/ contact</div><h1>Send a message.</h1><p>{settings.contact_intro}</p><div class="contacts"><a href={`mailto:${settings.contact_email}`}><small>EMAIL</small>{settings.contact_email}</a><a href={settings.contact_github} target="_blank" rel="noopener noreferrer"><small>GITHUB</small>{settings.contact_github.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a><a href={settings.contact_linkedin} target="_blank" rel="noopener noreferrer"><small>LINKEDIN</small>{settings.contact_linkedin.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a></div></div>
+<Layout title="Contact" description="Direct contact channels for cybersecurity, engineering, and technical collaboration.">
+  <section class="contact-layout" aria-labelledby="contact-title">
+    <div class="contact-brief">
+      <p class="contact-eyebrow">/ CONTACT</p>
+      <h1 id="contact-title">Direct Channels.</h1>
+      <p class="contact-intro">Direct communication endpoints for cybersecurity inquiries, penetration testing engagements, or technical collaboration.</p>
+      <dl class="contact-telemetry" aria-label="Contact availability">
+        <div><dt>STATUS</dt><dd><span class="contact-status-dot" aria-hidden="true"></span>Available for Security &amp; Engineering Roles</dd></div>
+        <div><dt>LOCATION</dt><dd>Kuala Lumpur, MY (UTC+8)</dd></div>
+        <div><dt>RESPONSE SLA</dt><dd>&lt; 24 Hours</dd></div>
+      </dl>
+    </div>
+
+    <div class="contact-endpoints" aria-label="Contact endpoints">
+      <article class="contact-endpoint">
+        <div class="contact-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3.5 5.5h17v13h-17z"/><path d="m4 7 8 5.5L20 7"/></svg></div>
+        <div class="contact-endpoint-copy"><span class="contact-endpoint-label">PRIMARY EMAIL</span><a class="contact-endpoint-value" href={`mailto:${settings.contact_email}`}>{settings.contact_email}</a></div>
+        <button class="contact-copy" type="button" data-copy-value={settings.contact_email} data-copy-default="Copy" aria-label={`Copy ${settings.contact_email}`}><svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/></svg><svg class="copy-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.2 4.2L19 6.7"/></svg><span data-copy-text aria-live="polite">Copy</span></button>
+      </article>
+      <article class="contact-endpoint">
+        <div class="contact-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.18-3.37-1.18-.45-1.15-1.1-1.45-1.1-1.45-.9-.62.07-.6.07-.6 1 .07 1.52 1.03 1.52 1.03.89 1.52 2.33 1.08 2.9.83.09-.64.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.8c.85 0 1.7.11 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.9.68 1.82v2.7c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg></div>
+        <div class="contact-endpoint-copy"><span class="contact-endpoint-label">GITHUB</span><a class="contact-endpoint-value" href={settings.contact_github} target="_blank" rel="me noopener noreferrer">{githubLabel}</a></div>
+        <a class="contact-external" href={settings.contact_github} target="_blank" rel="me noopener noreferrer" aria-label="Open Samuel's GitHub in a new tab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg></a>
+      </article>
+      <article class="contact-endpoint">
+        <div class="contact-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.1 3.5a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2ZM3.7 8.1h2.8v12.4H3.7V8.1Zm4.6 0H11v1.7h.04c.38-.72 1.3-2 2.88-2 3.08 0 3.65 2.03 3.65 4.67v8.05h-2.82v-7.14c0-1.7-.03-3.89-2.37-3.89-2.38 0-2.74 1.85-2.74 3.77v7.26H6.82V8.1Z"/></svg></div>
+        <div class="contact-endpoint-copy"><span class="contact-endpoint-label">LINKEDIN</span><a class="contact-endpoint-value" href={settings.contact_linkedin} target="_blank" rel="me noopener noreferrer">{linkedinLabel}</a></div>
+        <a class="contact-external" href={settings.contact_linkedin} target="_blank" rel="me noopener noreferrer" aria-label="Open Samuel's LinkedIn in a new tab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg></a>
+      </article>
+      <article class="contact-endpoint">
+        <div class="contact-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="8" cy="15" r="3.25"/><path d="m10.3 12.7 8.2-8.2M15.8 7.2l1.5 1.5m-3.7 1.3 1.5 1.5M8 18.25V21m-2.25-5.7H3"/></svg></div>
+        <div class="contact-endpoint-copy"><span class="contact-endpoint-label">PGP PUBLIC KEY</span><span class="contact-endpoint-value contact-key-value">{pgpFingerprint}</span></div>
+        <button class="contact-copy" type="button" data-copy-value={pgpFingerprint} data-copy-default="Copy" aria-label="Copy PGP public-key fingerprint"><svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/></svg><svg class="copy-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.2 4.2L19 6.7"/></svg><span data-copy-text aria-live="polite">Copy</span></button>
+      </article>
+    </div>
+  </section>
 </Layout>
+<style>
+  .contact-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(2rem,5vw,4.5rem);align-items:start;min-height:54vh;padding:clamp(2rem,5vw,4.75rem) clamp(1.25rem,3vw,3rem);border-left:1px solid rgba(255,255,255,.1)}
+  .contact-brief{max-width:44rem}.contact-eyebrow{margin:0 0 1.15rem;color:var(--accent);font:600 .75rem/1.4 var(--mono);letter-spacing:.15em}.contact-brief h1{margin:0;color:#f8fafc;font:600 clamp(2.75rem,5.5vw,4.9rem)/.98 var(--sans);letter-spacing:-.055em}.contact-intro{max-width:37rem;margin:1.55rem 0 2.25rem;color:var(--muted);font-size:clamp(1rem,1.7vw,1.16rem);line-height:1.65}
+  .contact-telemetry{margin:0;border:1px solid rgba(56,189,248,.24);background:rgba(15,23,42,.6);box-shadow:0 1px 0 #ffffff0a inset}.contact-telemetry>div{display:grid;grid-template-columns:minmax(112px,.65fr) minmax(0,1.7fr);gap:1rem;align-items:center;min-height:3.6rem;padding:.7rem 1rem;border-bottom:1px solid rgba(56,189,248,.14)}.contact-telemetry>div:last-child{border-bottom:0}.contact-telemetry dt{color:var(--accent);font:600 .67rem/1.4 var(--mono);letter-spacing:.1em}.contact-telemetry dd{display:flex;align-items:center;gap:.5rem;margin:0;color:var(--ink);font-size:.9rem;line-height:1.35}.contact-status-dot{width:.55rem;height:.55rem;flex:0 0 auto;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px #10b98125;animation:status-pulse 2.2s ease-in-out infinite}
+  .contact-endpoints{display:grid;gap:.75rem}.contact-endpoint{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.8rem;align-items:center;min-height:5.6rem;padding:1rem 1.15rem;border:1px solid rgba(56,189,248,.18);border-radius:6px;background:rgba(15,23,42,.75);transition:transform .2s ease,border-color .2s ease,background-color .2s ease,box-shadow .2s ease}.contact-endpoint:hover,.contact-endpoint:focus-within{border-color:#38bdf8;background:rgba(27,49,68,.9);transform:translateX(4px);box-shadow:0 10px 25px #00000020}.contact-icon{display:grid;place-items:center;width:2rem;height:2rem;color:var(--accent)}.contact-icon svg{width:16px;height:16px;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}.contact-endpoint-copy{min-width:0;display:flex;flex-direction:column;gap:.22rem}.contact-endpoint-label{color:var(--accent);font:600 .65rem/1.3 var(--mono);letter-spacing:.1em}.contact-endpoint-value{overflow:hidden;color:#f8fafc;font-size:.95rem;line-height:1.35;overflow-wrap:anywhere;text-decoration:none}.contact-endpoint-value[href]:hover{color:var(--accent)}.contact-key-value{font-family:var(--mono);font-size:.88rem;letter-spacing:.035em}
+  .contact-copy,.contact-external{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-width:2.25rem;min-height:2.25rem;padding:.4rem .6rem;border:1px solid rgba(56,189,248,.3);border-radius:5px;background:transparent;color:var(--accent);font:600 .72rem/1 var(--sans);text-decoration:none;cursor:pointer;transition:background-color .2s ease,border-color .2s ease,color .2s ease}.contact-copy svg,.contact-external svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.contact-copy .copy-check{display:none}.contact-copy.is-copied{border-color:#10b981;background:#10b98116;color:#71ddb7}.contact-copy.is-copied .copy-icon{display:none}.contact-copy.is-copied .copy-check{display:block}.contact-copy:hover,.contact-external:hover{border-color:var(--accent);background:var(--accent);color:var(--paper-ink)}.contact-copy:focus-visible,.contact-external:focus-visible,.contact-endpoint-value:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}
+  @keyframes status-pulse{50%{box-shadow:0 0 0 6px transparent}}
+  :global(:root[data-theme="light"]) .contact-layout{border-left-color:rgba(18,38,52,.17)}:global(:root[data-theme="light"]) .contact-brief h1,:global(:root[data-theme="light"]) .contact-endpoint-value{color:#122634}:global(:root[data-theme="light"]) .contact-telemetry,:global(:root[data-theme="light"]) .contact-endpoint{background:rgba(246,250,252,.77);border-color:rgba(23,123,179,.25)}:global(:root[data-theme="light"]) .contact-endpoint:hover,:global(:root[data-theme="light"]) .contact-endpoint:focus-within{background:#f8fcfe;border-color:#177bb3;box-shadow:0 10px 25px #1a4d6914}:global(:root[data-theme="light"]) .contact-telemetry>div{border-bottom-color:rgba(23,123,179,.16)}:global(:root[data-theme="light"]) .contact-copy:hover,:global(:root[data-theme="light"]) .contact-external:hover{background:var(--accent);color:var(--paper-ink)}
+  @media(max-width:767px){.contact-layout{grid-template-columns:1fr;gap:2rem;padding:2rem 1.1rem}.contact-brief h1{font-size:clamp(2.7rem,13vw,4rem)}.contact-telemetry>div{grid-template-columns:1fr;gap:.25rem;padding:.85rem 1rem}.contact-endpoint{padding:.9rem}.contact-endpoint-value{font-size:.87rem}}
+  @media(prefers-reduced-motion:reduce){.contact-status-dot{animation:none}.contact-endpoint,.contact-copy,.contact-external{transition:none}}
+</style>
+<script is:inline src="/scripts/contact-endpoints.js"></script>
