@@ -20,19 +20,18 @@ const events = [...gallery.reduce((collection, photo) => {
   <div class="event-list">
     {events.map((event, index) => (
       <article id={`event-${event.event_slug}`} class="event-item">
-        {event.linkedin_url ? <a href={event.linkedin_url} target="_blank" rel="noopener noreferrer" aria-labelledby={`event-title-${index}`} aria-describedby={`event-summary-${index}`}><img src={event.src} alt={event.alt} width={event.width ?? undefined} height={event.height ?? undefined} loading="lazy" decoding="async" /><div class="event-copy"><span class="event-number">0{index + 1} / 0{events.length}</span><h2 id={`event-title-${index}`}>{event.title}</h2><p id={`event-summary-${index}`}>{event.summary}</p><span class="event-photo-count">{event.photos.length} {event.photos.length === 1 ? 'photo' : 'photos'} in gallery</span><span class="event-open">Read on LinkedIn ↗</span></div></a> : <div class="event-static"><img src={event.src} alt={event.alt} width={event.width ?? undefined} height={event.height ?? undefined} loading="lazy" decoding="async" /><div class="event-copy"><span class="event-number">0{index + 1} / 0{events.length}</span><h2 id={`event-title-${index}`}>{event.title}</h2><p id={`event-summary-${index}`}>{event.summary}</p><span class="event-photo-count">{event.photos.length} {event.photos.length === 1 ? 'photo' : 'photos'} in gallery</span><span class="event-unlinked">LinkedIn post not linked yet</span></div></div>}
+        <div class="event-media">{event.linkedin_url ? <a href={event.linkedin_url} target="_blank" rel="noopener noreferrer" aria-label={`Read ${event.title} on LinkedIn`}><img src={event.src} alt={event.alt} width={event.width ?? undefined} height={event.height ?? undefined} loading="lazy" decoding="async" /></a> : <img src={event.src} alt={event.alt} width={event.width ?? undefined} height={event.height ?? undefined} loading="lazy" decoding="async" />}</div>
+        <div class="event-copy"><span class="event-number">0{index + 1} / 0{events.length}</span><h2 id={`event-title-${index}`}>{event.title}</h2><p id={`event-summary-${index}`}>{event.summary}</p><span class="event-photo-count">{event.photos.length} {event.photos.length === 1 ? 'photo' : 'photos'} in gallery</span>{event.linkedin_url ? <a class="event-open" href={event.linkedin_url} target="_blank" rel="noopener noreferrer">Read on LinkedIn <span aria-hidden="true">↗</span></a> : <span class="event-unlinked">LinkedIn post not linked yet</span>}</div>
       </article>
     ))}
   </div>
 </Layout>
 <style>
   .page-lede { color: var(--muted); max-width: 40ch; margin: .8rem 0 0; }
-  .event-item { margin: 0 0 clamp(4rem, 8vw, 7rem); }
-  .event-item a,.event-static { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr); gap: clamp(1.5rem, 5vw, 5rem); align-items: center; color: inherit; text-decoration: none; }
-  .event-item:nth-child(even) a,.event-item:nth-child(even) .event-static { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
-  .event-item:nth-child(even) img { order: 2; }
-  .event-item img { display: block; width: 100%; height: clamp(280px, 40vw, 510px); object-fit: cover; object-position: center 30%; transition: transform 240ms ease, filter 240ms ease; }
-  .event-item a:hover img, .event-item a:focus-visible img { transform: translateY(-3px); filter: saturate(1.08); }
+  .event-item { display:grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr); gap:clamp(1.5rem, 5vw, 5rem); align-items:center; margin:0 0 clamp(4rem, 8vw, 7rem); }
+  .event-item:nth-child(even){grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}.event-item:nth-child(even) .event-media{order:2}
+  .event-media a{display:block}.event-item img { display: block; width: 100%; height: clamp(280px, 40vw, 510px); object-fit: cover; object-position: center 30%; transition: transform 240ms ease, filter 240ms ease; }
+  .event-media a:hover img, .event-media a:focus-visible img { transform: translateY(-3px); filter: saturate(1.08); }.event-media a:focus-visible{outline:3px solid var(--accent);outline-offset:5px}
   .event-copy { border-top: 1px solid var(--line); padding-top: 1rem; }
   .event-number { color: var(--accent); font: 600 .75rem var(--mono); }
   .event-copy h2 { font: 600 clamp(2rem, 4vw, 3.4rem)/1.05 var(--sans); letter-spacing: -.045em; margin: 1.5rem 0 1rem; }
@@ -40,7 +39,7 @@ const events = [...gallery.reduce((collection, photo) => {
   .event-open { display: inline-flex; align-items: center; min-height: 44px; padding: .65rem 1rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; margin-top: 1.5rem; transition: background-color 180ms ease, color 180ms ease; }
   .event-unlinked{display:inline-flex;margin-top:1.5rem;color:var(--muted);font:.78rem var(--mono)}
   .event-photo-count{display:block;margin-top:1rem;color:var(--muted);font:.72rem var(--mono);letter-spacing:.04em;text-transform:uppercase}
-  .event-item a:hover .event-open, .event-item a:focus-visible .event-open { color: var(--paper-ink); background: var(--accent-hover); border-color: var(--accent-hover); }
+  .event-open:hover,.event-open:focus-visible { color: var(--paper-ink); background: var(--accent-hover); border-color: var(--accent-hover); outline:none; }
   @media (prefers-reduced-motion: no-preference) {
     .event-item:first-child, .event-item:first-child .event-copy { animation: event-enter 600ms both; }
     .event-item:first-child .event-copy { animation-delay: 100ms; }
@@ -53,8 +52,8 @@ const events = [...gallery.reduce((collection, photo) => {
     .event-item img, .event-open { transition: none; }
   }
   @media (max-width: 680px) {
-    .event-item a, .event-item:nth-child(even) a,.event-static,.event-item:nth-child(even) .event-static { grid-template-columns: 1fr; gap: 1.2rem; }
-    .event-item:nth-child(even) img { order: 0; }
+    .event-item,.event-item:nth-child(even) { grid-template-columns: 1fr; gap: 1.2rem; }
+    .event-item:nth-child(even) .event-media { order: 0; }
     .event-item img { height: 300px; }
     .event-copy h2 { margin-top: 1rem; }
   }

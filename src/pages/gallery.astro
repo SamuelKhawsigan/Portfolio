@@ -4,13 +4,18 @@ import Layout from '../layouts/Layout.astro';
 import { getGalleryPhotos, getSiteSettings } from '../lib/site-content';
 const [photos, settings] = await Promise.all([getGalleryPhotos(), getSiteSettings()]);
 const scrollDuration = Math.max(120, Math.min(1600, Number(settings.gallery_scroll_duration) || 420));
+const eventTitles = new Map<string, string>();
+for (const photo of photos) {
+  const eventId = photo.event_slug || photo.slug;
+  if (!eventTitles.has(eventId)) eventTitles.set(eventId, photo.title);
+}
 ---
 <Layout title="Gallery" description="Photos from Samuel Khawsigan’s events and visits.">
   <div class="page-head"><h1>Gallery</h1><a class="text-command" href="/events/">Events ↗</a></div>
   {photos.length ? <><div class="gallery-rail-controls" aria-label="Gallery controls"><span><b aria-hidden="true">←</b> <kbd>←</kbd> <kbd>→</kbd> to browse</span><div><button type="button" data-rail-prev aria-label="Scroll gallery left">←</button><button type="button" data-rail-next aria-label="Scroll gallery right">→</button></div></div><div class="gallery-stream" data-gallery-stream data-scroll-duration={scrollDuration}>
     {photos.map((photo, index) => (
       <figure id={photo.slug} class="gallery-item">
-        <button class="gallery-open" type="button" data-gallery-open data-src={photo.src} data-alt={photo.alt} data-title={photo.title} data-summary={photo.summary} data-event-href={`/events/#event-${encodeURIComponent(photo.event_slug || photo.slug)}`} data-event-title={photo.title} aria-label={`Open full photo: ${photo.title}`}>
+        <button class="gallery-open" type="button" data-gallery-open data-src={photo.src} data-alt={photo.alt} data-title={photo.title} data-summary={photo.summary} data-event-href={`/events/#event-${encodeURIComponent(photo.event_slug || photo.slug)}`} data-event-title={eventTitles.get(photo.event_slug || photo.slug) ?? photo.title} aria-label={`Open full photo: ${photo.title}`}>
           <img src={photo.src} alt={photo.alt} width={photo.width ?? undefined} height={photo.height ?? undefined} loading="lazy" decoding="async" />
           <span class="gallery-open-label">View photo <b aria-hidden="true">↗</b></span>
         </button>
